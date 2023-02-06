@@ -19,7 +19,6 @@ def init_gee():
     credentials = ee.ServiceAccountCredentials(service_account, 'gee_service_account.json')
     ee.Initialize(credentials)
 
-
 def known_mangroves() -> ee.Image:
     return ee.ImageCollection("LANDSAT/MANGROVE_FORESTS").reduce(ee.Reducer.mean())
 
@@ -27,6 +26,29 @@ def topo_dsm() -> ee.Image:
     dsm = ee.Image("JAXA/ALOS/AW3D30/V2_2").select("AVE_DSM").rename("elev")
     slp_img = ee.Terrain.slope(ee.Image(dsm).select("elev")).double().rename("slope")
     return dsm.addBands(slp_img)
+
+def topo_mask(dsm: ee.Image, mangs: ee.Image) -> ee.Image:
+    mang_elv = dsm.select('elev').updateMask(mangs).reduceRegion(
+            reducer = ee.Reducer.percentile(percentiles = [99]),
+            geometry = mangs.geometry(),
+            scale = 30,
+            maxPixels = 1e12,
+            bestEffort = True
+    )
+
+    mang_slope = dsm.select('slope').updateMask(mangs).reduceRegion(
+            reducer = ee.Reducer.percentile(percentiles = [99]),
+            geometry = mangs.geometry(),
+            scale = 30,
+            maxPixels = 1e12,
+            bestEffort = True
+    )
+
+    el_val = ee.Image.constant(mang_elv.get('elev'))
+    slp_val = ee.Image.constant(mang_slope.get('slope'))
+
+    return dsm.select('elev').lte(el_val).And(dsm.select('slope').lte(slp_val)).double()
+
 
 # roi here should the dict equivalent of a geojson polygon
 def coastline(poly: dict) -> ee.Geometry:
@@ -75,7 +97,7 @@ class NoContemporaryImages(Exception):
 class NoHistoricalImages(Exception):
     pass
 
-def serialize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
+def visualize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
     try:
         hhot, hlot = hist_imagery(roi, buff_dist)
     except NoImages:
@@ -94,26 +116,34 @@ def serialize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
     hlot_url = hlot.getMapId(vis)["tile_fetcher"].url_format
     
     return {
-        "chot": chot.serialize(),
         "chot_url": chot_url,
-        "clot": clot.serialize(),
         "clot_url": clot_url,
-        "hhot": hhot.serialize(),
         "hhot_url": hhot_url,
-        "hlot": hlot.serialize(),
         "hlot_url": hlot_url
     }
 
+def final_mask(buff_dist: int, poly: dict, clot: ee.Image, hlot: ee.Image) -> ee.Image:
+    coast = coastline(poly)
+    poly = coast.buffer(buff_dist)
+    mangs = known_mangroves().clip(poly)
+    tmask = topo_mask(topo_dsm(), mangs)
+
+    mndwi_cont = clot.normalizedDifference(['B5', 'B2']).gte(0.09)
+    mndwi_hist = hlot.normalizedDifference(['B5', 'B2']).gte(0.09)
+    h2o_mask = mndwi_cont.add(mndwi_hist).gt(1)
+
+    return h2o_mask.multiply(tmask).eq(1)
+
 def cont_imagery(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
-    return get_imagery(buff_dist, roi["polygon"], roi["cont_year_start"], roi["cont_year_end"], roi["month_start"], roi["month_end"])
+    return get_imagery(buff_dist, roi["indicies"], roi["polygon"], roi["cont_year_start"], roi["cont_year_end"], roi["month_start"], roi["month_end"])
     
 def hist_imagery(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
-    return get_imagery(buff_dist, roi["polygon"], roi["hist_year_start"], roi["hist_year_end"], roi["month_start"], roi["month_end"])
+    return get_imagery(buff_dist, roi["indicies"], roi["polygon"], roi["hist_year_start"], roi["hist_year_end"], roi["month_start"], roi["month_end"])
     
 class NoImages(Exception):
     pass
 
-def get_imagery(buff_dist: int, poly: dict, year1: int, year2: int, month1: int, month2: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
+def get_imagery(buff_dist: int, indicies: List[str], poly: dict, year1: int, year2: int, month1: int, month2: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
     coast = coastline(poly)
     poly = coast.buffer(buff_dist)
     zone = coast.simplify(500).buffer(tidalZone).simplify(500)
@@ -144,8 +174,22 @@ def get_imagery(buff_dist: int, poly: dict, year1: int, year2: int, month1: int,
     
     high_tide = ee.ImageCollection(imgs).qualityMosaic("MNDWI").select(['B1','B2','B3','B4','B5','B6','B7'])
     low_tide = ee.ImageCollection(imgs).qualityMosaic("inv_MNDWI").select(['B1','B2','B3','B4','B5','B6','B7'])
+
+    for idx in indicies:
+        if idx == 'CMRI':
+            high_tide = add_cmri(high_tide)
+            low_tide = add_cmri(low_tide)
+        elif idx == 'MMRI':
+            high_tide = add_mmri(high_tide)
+            low_tide = add_mmri(low_tide)
+        elif idx == 'MNDWI':
+            high_tide = add_mndwi(high_tide)
+            low_tide = add_mndwi(low_tide)
+        elif idx == 'SAVI':
+            high_tide = add_savi(high_tide)
+            low_tide = add_savi(low_tide)
     
-    return high_tide, low_tide
+    return high_tide.float().clip(poly), low_tide.float().clip(poly)
 
 
 def ls4_imagery(poly: ee.Geometry, year1: int, year2: int, month1: int, month2: int) -> ee.ImageCollection:
@@ -178,7 +222,7 @@ def etm_to_oli(img: ee.Image) -> ee.Image:
 def apply_scale_factors(img: ee.Image) -> ee.Image:
     opticalBands = img.select(['B1','B2','B3','B4','B5','B7']).multiply(0.0000275).add(-0.2)
     thermalBand = img.select(['B6']).multiply(0.00341802).add(149.0)
-    return img.addBands(opticalBands, None, True).addBands(thermalBand, None, True);
+    return img.addBands(opticalBands, None, True).addBands(thermalBand, None, True)
 
 def fix_float(img: ee.Image) -> ee.Image:
     specCast = img.select(['B1','B2','B3','B4','B5','B7']).cast({'B1':'float', 'B2': 'float', 'B3': 'float', 'B4': 'float', 'B5': 'float', 'B7': 'float'})
@@ -240,3 +284,26 @@ def tide_bands(imgs: ee.ImageCollection) -> ee.ImageCollection:
         return img.addBands(img.metadata("inv_MNDWI"))
     
     return imgs.map(mndwi_band).map(inv_mndwi).map(inv_mndwi_band)
+
+def add_cmri(img: ee.Image) -> ee.Image:
+    return img.addBands(produce_ndvi(img).subtract(produce_mndwi(img)).rename('CMRI'))
+
+def add_mndwi(img: ee.Image) -> ee.Image:
+    return img.addBands(produce_mndwi(img))
+
+def add_mmri(img: ee.Image) -> ee.Image:
+    ndvi = produce_ndvi(img).abs()
+    mndwi = produce_mndwi(img).abs()
+    return img.addBands(mndwi.subtract(ndvi).divide(mndwi.add(ndvi)).rename(['MMRI']))
+
+def add_savi(img: ee.Image) -> ee.Image:
+    return img.addBands(produce_savi(img))
+
+def produce_ndvi(img: ee.Image) -> ee.Image:
+    return img.expression('(B4 - B3)/(B4 + B3)', {'B4': img.select('B4'), 'B3': img.select('B3')}).rename(['NDVI'])
+
+def produce_mndwi(img: ee.Image) -> ee.Image:
+    return img.expression('(B2 - B5)/(B2 + B5)', {'B2': img.select('B2'), 'B5': img.select('B5')}).rename(['MNDWI'])
+
+def produce_savi(img: ee.Image) -> ee.Image:
+    return img.select('B4').subtract(img.select('B3')).divide(img.select('B4').add(img.select('B3')).add(0.5)).multiply(1.5).rename(['SAVI'])

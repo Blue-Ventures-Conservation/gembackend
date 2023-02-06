@@ -21,13 +21,13 @@ def area_chart_route():
 def ls_imagery_route():
     content = request.json
     try:
-        serialized = serialize_imagery(content, content["buff_dist"])
+        visuals = visualize_imagery(content, content["buff_dist"])
     except NoHistoricalImages:
         return "No historical images", 400
     except NoContemporaryImages:
         return "No contemporary images", 400
     
-    return jsonify(serialized)
+    return jsonify(visuals)
 
 if __name__ == "__main__":
     init_gee()
