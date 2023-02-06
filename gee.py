@@ -15,8 +15,8 @@ ls8_dataset = "LANDSAT/LC08/C02/T1_L2"
 ls9_dataset = "LANDSAT/LC09/C02/T1_L2"
 
 def init_gee():
-    service_account = 'backend@crflask.iam.gserviceaccount.com'
-    credentials = ee.ServiceAccountCredentials(service_account, 'gee_service_account.json')
+    service_account = 'firebase-adminsdk-7r5sg@crflask.iam.gserviceaccount.com'
+    credentials = ee.ServiceAccountCredentials(service_account, 'firebase_service_account.json')
     ee.Initialize(credentials)
 
 def known_mangroves() -> ee.Image:
