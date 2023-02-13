@@ -2,9 +2,8 @@ import ee
 from typing import Dict, List, Tuple
 
 buffers = {
-    '01_km': 1000, '02.5_km': 2500, '05_km': 5000, '07.5_km': 7500,
-    '10_km': 10000, '12.5_km': 12500, '15_km': 15000, '17.5_km': 17500,
-    '20_km': 20000, '22.5_km': 22500, '23_km': 23000, '25_km': 25000
+    '1 km': 1000, '2.5 km': 2500, '5 km': 5000, '7.5 km': 7500, '10 km': 10000, '12.5 km': 12500,
+    '15 km': 15000, '17.5 km': 17500, '20 km': 20000, '22.5 km': 22500, '25 km': 25000
 }
 cloudCoverLimit = 15
 tidalZone = 1000
@@ -68,12 +67,12 @@ def area_chart(poly: dict) -> Dict[str, dict]:
     coast = coastline(poly).simplify(1000)
     # create an image collection of various buffered mangroves, using the distance list
     mangrove_buff = ee.Image(mang) \
-        .addBands(mang.clip(coast.buffer(1000)).rename(['01_km'])) \
-        .addBands(mang.clip(coast.buffer(2500)).rename(['02_km'])) \
-        .addBands(mang.clip(coast.buffer(5000)).rename(['05_km'])) \
-        .addBands(mang.clip(coast.buffer(10000)).rename(['10_km'])) \
-        .addBands(mang.clip(coast.buffer(15000)).rename(['15_km'])) \
-        .addBands(mang.clip(coast.buffer(20000)).rename(['20_km']))
+        .addBands(mang.clip(coast.buffer(1000)).rename(['1'])) \
+        .addBands(mang.clip(coast.buffer(2500)).rename(['2'])) \
+        .addBands(mang.clip(coast.buffer(5000)).rename(['5'])) \
+        .addBands(mang.clip(coast.buffer(10000)).rename(['10'])) \
+        .addBands(mang.clip(coast.buffer(15000)).rename(['15'])) \
+        .addBands(mang.clip(coast.buffer(20000)).rename(['20']))
 
     bands = mangrove_buff.bandNames().slice(1,8)
     mangrove_buff = mangrove_buff.select(bands)
@@ -89,7 +88,9 @@ def area_chart(poly: dict) -> Dict[str, dict]:
         bestEffort = True
     ).getInfo()
     
-    return {"sums": sums, "buffers": buffers}
+    sums = dict(sorted(sums.items(), key=lambda x:x[1]))
+
+    return {"sums": {"keys": list(sums.keys()), "vals": [int(x) for x in list(sums.values())]}, "buffers": {"keys": list(buffers.keys()), "vals": list(buffers.values())}}
 
 class NoContemporaryImages(Exception):
     pass
@@ -135,15 +136,15 @@ def final_mask(buff_dist: int, poly: dict, clot: ee.Image, hlot: ee.Image) -> ee
     return h2o_mask.multiply(tmask).eq(1)
 
 def cont_imagery(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
-    return get_imagery(buff_dist, roi["indicies"], roi["polygon"], roi["cont_year_start"], roi["cont_year_end"], roi["month_start"], roi["month_end"])
+    return get_imagery(buff_dist, roi["indices"], roi["polygon"], roi["cont_year_start"], roi["cont_year_end"], roi["month_start"], roi["month_end"])
     
 def hist_imagery(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
-    return get_imagery(buff_dist, roi["indicies"], roi["polygon"], roi["hist_year_start"], roi["hist_year_end"], roi["month_start"], roi["month_end"])
+    return get_imagery(buff_dist, roi["indices"], roi["polygon"], roi["hist_year_start"], roi["hist_year_end"], roi["month_start"], roi["month_end"])
     
 class NoImages(Exception):
     pass
 
-def get_imagery(buff_dist: int, indicies: List[str], poly: dict, year1: int, year2: int, month1: int, month2: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
+def get_imagery(buff_dist: int, indices: List[str], poly: dict, year1: int, year2: int, month1: int, month2: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
     coast = coastline(poly)
     poly = coast.buffer(buff_dist)
     zone = coast.simplify(500).buffer(tidalZone).simplify(500)
@@ -175,7 +176,7 @@ def get_imagery(buff_dist: int, indicies: List[str], poly: dict, year1: int, yea
     high_tide = ee.ImageCollection(imgs).qualityMosaic("MNDWI").select(['B1','B2','B3','B4','B5','B6','B7'])
     low_tide = ee.ImageCollection(imgs).qualityMosaic("inv_MNDWI").select(['B1','B2','B3','B4','B5','B6','B7'])
 
-    for idx in indicies:
+    for idx in indices:
         if idx == 'CMRI':
             high_tide = add_cmri(high_tide)
             low_tide = add_cmri(low_tide)
