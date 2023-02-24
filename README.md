@@ -46,3 +46,12 @@ shelling out to the command line tool with a command similar to this:
 
 If the user is a new one, we first create a new folder for that user like so:
 `earthengine --service_account_file=firebase_service_account.json create folder projects/gem-project-378721/assets/CRAs/users/ABC123`
+
+### IAM principal roles
+
+The backend uses a Firebase Admin SDK service account for pretty much everything. When Firebase is setup on a project, this service account is created automatically.
+
+We manually create the credentials for this service account, and that is what is in the `firebase_service_account.json` file referenced in a few places.
+This file can only be downloaded once, but it is also available in Google Cloud's Secret Manager, which is in the Security section of the interface.
+
+In addition to creating the credentials, we also edit the roles for this principal in IAM by add the role: `Earth Engine Resource Admin`
