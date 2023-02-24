@@ -12,7 +12,7 @@ WORKDIR $APP_HOME
 COPY main.py ./
 COPY gee.py ./
 COPY requirements.txt ./
-COPY gee_service_account.json ./
+COPY firebase_service_account.json ./
 
 # Install production dependencies.
 RUN pip install --no-cache-dir -r requirements.txt
