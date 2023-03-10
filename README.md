@@ -55,3 +55,9 @@ We manually create the credentials for this service account, and that is what is
 This file can only be downloaded once, but it is also available in Google Cloud's Secret Manager, which is in the Security section of the interface.
 
 In addition to creating the credentials, we also edit the roles for this principal in IAM by add the role: `Earth Engine Resource Admin`
+
+Earth Engine itself also wants to know about your cloud project, and you can link them up here:
+https://cloud.google.com/earth-engine
+
+This will enable the Google Earth Engine API for the project, and create a project in Google Earth Engine with the same name, and an assets folder:
+`projects/project_name/assets`

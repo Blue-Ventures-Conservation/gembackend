@@ -136,10 +136,10 @@ def final_mask(buff_dist: int, poly: dict, clot: ee.Image, hlot: ee.Image) -> ee
     return h2o_mask.multiply(tmask).eq(1)
 
 def cont_imagery(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
-    return get_imagery(buff_dist, roi["indices"], roi["polygon"], roi["cont_year_start"], roi["cont_year_end"], roi["month_start"], roi["month_end"])
+    return get_imagery(buff_dist, roi["indices"], roi["polygon"], roi["cont_year_start"], roi["cont_year_end"], roi["cont_month_start"], roi["cont_month_end"])
     
 def hist_imagery(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
-    return get_imagery(buff_dist, roi["indices"], roi["polygon"], roi["hist_year_start"], roi["hist_year_end"], roi["month_start"], roi["month_end"])
+    return get_imagery(buff_dist, roi["indices"], roi["polygon"], roi["hist_year_start"], roi["hist_year_end"], roi["hist_month_start"], roi["hist_month_end"])
     
 class NoImages(Exception):
     pass
