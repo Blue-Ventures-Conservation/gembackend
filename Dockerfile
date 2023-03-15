@@ -10,7 +10,8 @@ ENV PYTHONUNBUFFERED True
 ENV APP_HOME /app
 WORKDIR $APP_HOME
 COPY main.py ./
-COPY gee.py ./
+COPY module1.py ./
+COPY cli.py ./
 COPY requirements.txt ./
 COPY firebase_service_account.json ./
 
