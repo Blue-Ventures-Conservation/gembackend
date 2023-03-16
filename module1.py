@@ -13,9 +13,6 @@ ls7_dataset = "LANDSAT/LE07/C02/T1_L2"
 ls8_dataset = "LANDSAT/LC08/C02/T1_L2"
 ls9_dataset = "LANDSAT/LC09/C02/T1_L2"
 
-def init_gee(credentials):
-    ee.Initialize(credentials)
-
 def known_mangroves() -> ee.Image:
     return ee.ImageCollection("LANDSAT/MANGROVE_FORESTS").reduce(ee.Reducer.mean())
 

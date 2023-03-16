@@ -1,0 +1,81 @@
+import ee, logging
+
+from typing import Tuple
+from pathlib import Path
+from time import sleep
+
+asset_users_path = 'gem-project-378721'
+asset_users_path = 'projects/gem-project-378721/assets/users/{uid}'
+asset_users_table_path = 'projects/gem-project-378721/assets/users/{uid}/{stem}'
+asset_user_shps = 'gs://gem-project-378721.appspot.com/users/{uid}/shps/{key}'
+
+def create_user_asset_folder(uid: str) -> bool:
+    path = asset_users_path.format(uid = uid)
+    if folder_exists(path):
+        return True
+    
+    try:
+        ee.data.createAsset({'type': ee.data.ASSET_TYPE_FOLDER}, path)
+        return True
+    except:
+        return False
+
+def upload_table_asset(uid: str, key: str) -> Tuple[str, bool]:
+    if not create_user_asset_folder(uid):
+        return "", False
+
+    name = asset_users_table_path.format(uid = uid, stem = Path(key).stem)
+    if asset_exists(path):
+        return "", True
+
+    try:
+        shp = asset_user_shps.format(uid = uid, key = key)
+        result = ee.data.startTableIngestion(request_id = ee.data.newTaskId()[0], params = {'name': name, 'sources': [{'uris': [shp], 'charset': 'UTF-8'}]})
+        return result['name'], True
+    except:
+        return "", False
+
+def await_table_upload(uid: str, key: str) -> bool:
+    name, success = upload_table_asset(uid, key)
+    if not success: return False
+
+    while True:
+        sleep(15)
+        ok, err = check_operation(name)
+        if err is not None:
+            logging.error(err)
+            return False
+
+        if ok: return True
+
+def check_operation(name: str) -> Tuple[bool, str]:
+    result = ee.data.getOperation(name)
+    
+    done = result['done']
+    state = result['metadata']['state']
+    success = state == 'SUCCEEDED'
+
+    if not done: return False, None
+    
+    if not success:
+        message = 'Unknown error'
+        if state == 'FAILED':
+            message = result['error']['message']
+        
+        return False, f'Upload operation failed: {message}'
+    
+    return True, None
+
+def asset_exists(name: str) -> bool:
+    try:
+        ee.data.getAsset(name)
+        return True
+    except:
+        return False
+
+def folder_exists(path: str) -> bool:
+    try:
+        ee.data.listAssets({'parent': path})
+        return True
+    except:
+        return False
