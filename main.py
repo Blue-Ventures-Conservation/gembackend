@@ -57,11 +57,19 @@ def hello_world():
     name = os.environ.get("NAME", "World")
     return "Hello {}!".format(name)
 
-@app.route("/upload_table")
+@app.route("/upload_cra", methods=["POST"])
 @token_check
 def upload_table_route(uid: str):
     content = request.json
-    success = await_table_upload(uid, content["key"])
+    key = content["key"]
+    name, success = upload_table_asset(uid, key)
+    return jsonify({'key': key, 'success': success, 'name': name})
+
+@app.route("/await_cra_upload", methods=["POST"])
+@token_check
+def await_table_upload_route(uid: str):
+    content = request.json
+    success = await_table_upload(uid, content["key"], content["name"])
     return jsonify({'success': success})
 
 @app.route("/area_chart", methods=["POST"])

@@ -25,7 +25,7 @@ def upload_table_asset(uid: str, key: str) -> Tuple[str, bool]:
         return "", False
 
     name = asset_users_table_path.format(uid = uid, stem = Path(key).stem)
-    if asset_exists(path):
+    if asset_exists(name):
         return "", True
 
     try:
@@ -35,36 +35,40 @@ def upload_table_asset(uid: str, key: str) -> Tuple[str, bool]:
     except:
         return "", False
 
-def await_table_upload(uid: str, key: str) -> bool:
-    name, success = upload_table_asset(uid, key)
-    if not success: return False
+def await_table_upload(uid: str, key: str, op: str) -> bool:
+    name = asset_users_table_path.format(uid = uid, stem = Path(key).stem)
+    if asset_exists(name):
+        return True
 
     while True:
-        sleep(15)
-        ok, err = check_operation(name)
+        ok, err = check_operation(op)
         if err is not None:
             logging.error(err)
             return False
 
         if ok: return True
+        sleep(10)
 
 def check_operation(name: str) -> Tuple[bool, str]:
-    result = ee.data.getOperation(name)
-    
-    done = result['done']
-    state = result['metadata']['state']
-    success = state == 'SUCCEEDED'
-
-    if not done: return False, None
-    
-    if not success:
-        message = 'Unknown error'
-        if state == 'FAILED':
-            message = result['error']['message']
+    try:
+        result = ee.data.getOperation(name)
         
-        return False, f'Upload operation failed: {message}'
-    
-    return True, None
+        done = result['done']
+        state = result['metadata']['state']
+        success = state == 'SUCCEEDED'
+        
+        if not done: return False, None
+        
+        if not success:
+            message = 'Unknown error'
+            if state == 'FAILED':
+                message = result['error']['message']
+        
+            return False, f'Upload operation failed: {message}'
+         
+        return True, None
+    except Exception as e:
+        return False, str(e)
 
 def asset_exists(name: str) -> bool:
     try:
