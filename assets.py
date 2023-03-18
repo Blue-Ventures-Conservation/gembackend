@@ -1,13 +1,11 @@
 import ee, logging
 
 from typing import Tuple
-from pathlib import Path
 from time import sleep
 
-asset_users_path = 'gem-project-378721'
 asset_users_path = 'projects/gem-project-378721/assets/users/{uid}'
-asset_users_table_path = 'projects/gem-project-378721/assets/users/{uid}/{stem}'
-asset_user_shps = 'gs://gem-project-378721.appspot.com/users/{uid}/shps/{key}'
+asset_users_table_path = 'projects/gem-project-378721/assets/users/{uid}/{key}'
+asset_user_shps = 'gs://gem-project-378721.appspot.com/users/{uid}/shps/{key}.zip'
 
 def create_user_asset_folder(uid: str) -> bool:
     path = asset_users_path.format(uid = uid)
@@ -17,14 +15,17 @@ def create_user_asset_folder(uid: str) -> bool:
     try:
         ee.data.createAsset({'type': ee.data.ASSET_TYPE_FOLDER}, path)
         return True
-    except:
-        return False
+    except Exception as e:
+        if "Cannot overwrite" in str(e):
+            return True
+        else:
+            return False
 
 def upload_table_asset(uid: str, key: str) -> Tuple[str, bool]:
     if not create_user_asset_folder(uid):
         return "", False
 
-    name = asset_users_table_path.format(uid = uid, stem = Path(key).stem)
+    name = asset_users_table_path.format(uid = uid, key = key)
     if asset_exists(name):
         return "", True
 
@@ -36,7 +37,7 @@ def upload_table_asset(uid: str, key: str) -> Tuple[str, bool]:
         return "", False
 
 def await_table_upload(uid: str, key: str, op: str) -> bool:
-    name = asset_users_table_path.format(uid = uid, stem = Path(key).stem)
+    name = asset_users_table_path.format(uid = uid, key = key)
     if asset_exists(name):
         return True
 
@@ -52,21 +53,23 @@ def await_table_upload(uid: str, key: str, op: str) -> bool:
 def check_operation(name: str) -> Tuple[bool, str]:
     try:
         result = ee.data.getOperation(name)
-        
-        done = result['done']
         state = result['metadata']['state']
-        success = state == 'SUCCEEDED'
+        pending = state == 'PENDING'
+        running = state == 'RUNNING'
+
+        if pending or running:
+            return False, None
+
+        succeeded = state == 'SUCCEEDED'
+
+        if succeeded:
+            return True, None
         
-        if not done: return False, None
+        message = 'Unknown error'
+        if state == 'FAILED':
+            message = result['error']['message']
         
-        if not success:
-            message = 'Unknown error'
-            if state == 'FAILED':
-                message = result['error']['message']
-        
-            return False, f'Upload operation failed: {message}'
-         
-        return True, None
+        return False, f'Upload operation failed: {message}'
     except Exception as e:
         return False, str(e)
 
