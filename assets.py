@@ -47,7 +47,11 @@ def await_table_upload(uid: str, key: str, op: str) -> bool:
             logging.error(err)
             return False
 
-        if ok: return True
+        if ok:
+            if asset_exists(name):
+                return True
+            else:
+                return False
         sleep(10)
 
 def check_operation(name: str) -> Tuple[bool, str]:
