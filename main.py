@@ -5,8 +5,9 @@ from functools import wraps
 from flask import Flask, request, abort, jsonify
 from firebase_admin import auth, credentials, initialize_app
 from google.auth import compute_engine
-from module1 import *
+from roi import *
 from assets import *
+from separability import *
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -14,7 +15,7 @@ firebase_app = None
 
 # debug vars
 is_debug = True
-args = None
+debug_uid = None
 
 # https://developers.google.com/earth-engine/guides/service_account#use-a-default-service-account
 def setup():
@@ -39,7 +40,7 @@ def token_check(func):
         
         if fail is not None:
             if is_debug:
-                uid = args.uid
+                uid = debug_uid
                 print("debug error:", fail, "using uid:", uid)
             else:
                 abort(401) # raise HTTPException
@@ -92,6 +93,30 @@ def ls_imagery_route():
     
     return jsonify(visuals)
 
+@app.route("/chot_corr", methods=["POST"])
+@token_check
+def chot_corr_route(uid: str):
+    content = request.json
+    return jsonify(chot_correlations(uid, content["cont_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
+
+@app.route("/clot_corr", methods=["POST"])
+@token_check
+def clot_corr_route(uid: str):
+    content = request.json
+    return jsonify(chot_correlations(uid, content["cont_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
+
+@app.route("/hhot_corr", methods=["POST"])
+@token_check
+def hhot_corr_route(uid: str):
+    content = request.json
+    return jsonify(chot_correlations(uid, content["hist_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
+
+@app.route("/hlot_corr", methods=["POST"])
+@token_check
+def hlot_corr_route(uid: str):
+    content = request.json
+    return jsonify(chot_correlations(uid, content["hist_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--uid", help = "the uid to use in debug mode when auth isn't provided")
@@ -101,5 +126,6 @@ if __name__ == "__main__":
     
     ee.Initialize(ee.ServiceAccountCredentials(args.sa, args.saf))
     firebase_app = initialize_app(credentials.Certificate(args.saf))
+    debug_uid = args.uid
     
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))

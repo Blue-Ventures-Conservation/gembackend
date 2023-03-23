@@ -3,12 +3,13 @@ import ee, logging
 from typing import Tuple
 from time import sleep
 
-asset_users_path = 'projects/gem-project-378721/assets/users/{uid}'
-asset_users_table_path = 'projects/gem-project-378721/assets/users/{uid}/{key}'
+asset_users_path = 'projects/gem-project-378721/assets/users/'
+asset_uid_path = asset_users_path+'{uid}'
+asset_users_table_path = asset_users_path+'{uid}/{key}'
 asset_user_shps = 'gs://gem-project-378721.appspot.com/users/{uid}/shps/{key}.zip'
 
 def create_user_asset_folder(uid: str) -> bool:
-    path = asset_users_path.format(uid = uid)
+    path = asset_uid_path.format(uid = uid)
     if folder_exists(path):
         return True
     
@@ -25,7 +26,7 @@ def upload_table_asset(uid: str, key: str) -> Tuple[str, bool]:
     if not create_user_asset_folder(uid):
         return "", False
 
-    name = asset_users_table_path.format(uid = uid, key = key)
+    name = asset_name(uid, key)
     if asset_exists(name):
         return "", True
 
@@ -37,21 +38,19 @@ def upload_table_asset(uid: str, key: str) -> Tuple[str, bool]:
         return "", False
 
 def await_table_upload(uid: str, key: str, op: str) -> bool:
-    name = asset_users_table_path.format(uid = uid, key = key)
+    name = asset_name(uid, key)
     if asset_exists(name):
         return True
-
+    
     while True:
         ok, err = check_operation(op)
         if err is not None:
             logging.error(err)
             return False
-
+        
         if ok:
-            if asset_exists(name):
-                return True
-            else:
-                return False
+            return asset_exists(name)
+        
         sleep(10)
 
 def check_operation(name: str) -> Tuple[bool, str]:
@@ -60,12 +59,12 @@ def check_operation(name: str) -> Tuple[bool, str]:
         state = result['metadata']['state']
         pending = state == 'PENDING'
         running = state == 'RUNNING'
-
+        
         if pending or running:
             return False, None
-
+        
         succeeded = state == 'SUCCEEDED'
-
+        
         if succeeded:
             return True, None
         
@@ -90,3 +89,6 @@ def folder_exists(path: str) -> bool:
         return True
     except:
         return False
+
+def asset_name(uid: str, key: str) -> str:
+    return asset_users_table_path.format(uid = uid, key = key)

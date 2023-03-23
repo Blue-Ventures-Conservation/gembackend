@@ -1,4 +1,9 @@
 {
+"cont_key": "TAB_CRA_2020_210224_binary",
+"hist_key": "TAB_CRA_2000_210301_binary",
+"num_label": "Classvalue",
+"char_label": "Classname",
+"roi": {
   "buff_dist":2500,
   "name":"my_roi",
   "cont_year_start":2019,
@@ -187,4 +192,5 @@
       ]
     ]
   }
+}
 }
