@@ -117,6 +117,30 @@ def hlot_corr_route(uid: str):
     content = request.json
     return jsonify(chot_correlations(uid, content["hist_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
 
+@app.route("/chot_box", methods=["POST"])
+@token_check
+def chot_box_route(uid: str):
+    content = request.json
+    return jsonify(chot_box_charts(uid, content["cont_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+
+@app.route("/clot_box", methods=["POST"])
+@token_check
+def clot_box_route(uid: str):
+    content = request.json
+    return jsonify(clot_box_charts(uid, content["cont_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+
+@app.route("/hhot_box", methods=["POST"])
+@token_check
+def hhot_box_route(uid: str):
+    content = request.json
+    return jsonify(hhot_box_charts(uid, content["hist_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+
+@app.route("/hlot_box", methods=["POST"])
+@token_check
+def hlot_box_route(uid: str):
+    content = request.json
+    return jsonify(hlot_box_charts(uid, content["hist_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--uid", help = "the uid to use in debug mode when auth isn't provided")

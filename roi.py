@@ -130,6 +130,22 @@ def final_mask(buff_dist: int, poly: dict, clot: ee.Image, hlot: ee.Image) -> ee
 
     return h2o_mask.multiply(tmask).eq(1)
 
+def chot_imagery(roi: dict, buff_dist: int) -> ee.ImageCollection:
+    chot, _ = cont_imagery(roi, buff_dist)
+    return chot
+
+def clot_imagery(roi: dict, buff_dist: int) -> ee.ImageCollection:
+    _, clot = cont_imagery(roi, buff_dist)
+    return clot
+
+def hhot_imagery(roi: dict, buff_dist: int) -> ee.ImageCollection:
+    hhot, _ = hist_imagery(roi, buff_dist)
+    return hhot
+
+def hlot_imagery(roi: dict, buff_dist: int) -> ee.ImageCollection:
+    _, hlot = hist_imagery(roi, buff_dist)
+    return hlot
+
 def cont_imagery(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
     return get_imagery(buff_dist, roi["indices"], roi["polygon"], roi["cont_year_start"], roi["cont_year_end"], roi["cont_month_start"], roi["cont_month_end"])
     
