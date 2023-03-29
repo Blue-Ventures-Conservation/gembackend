@@ -4,72 +4,82 @@ from typing import Dict, List
 from roi import chot_imagery, clot_imagery, hhot_imagery, hlot_imagery
 from assets import asset_name
 
-def chot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> List[dict]:
+def chot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, List[Dict[str, float]]]:
     return scatter_data(uid, key, num_label, char_label, chot_imagery(roi, buff_dist))
 
-def clot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> List[dict]:
+def clot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, List[Dict[str, float]]]:
     return scatter_data(uid, key, num_label, char_label, clot_imagery(roi, buff_dist))
 
-def hhot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> List[dict]:
+def hhot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, List[Dict[str, float]]]:
     return scatter_data(uid, key, num_label, char_label, hhot_imagery(roi, buff_dist))
 
-def hlot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> List[dict]:
+def hlot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, List[Dict[str, float]]]:
     return scatter_data(uid, key, num_label, char_label, hlot_imagery(roi, buff_dist))
 
-def scatter_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> List[dict]:
+# Returns dict of class name to list of dicts of band name to value. Values are reflectance for landsat, or index values.
+# Also contains an ordered list of classes at the root under 'classes'
+def scatter_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> Dict[str, List[Dict[str, float]]]:
     bands = img.bandNames().remove('B6').add(char_label)
     sample = sample_image(img, training_poly(uid, key, num_label), num_label, char_label)
     feats = sample.select(
         propertySelectors = bands,
         retainGeometry = False,
     ).toList(9999).getInfo()
+    ordered = ordered_classes(sample, num_label, char_label)
     
     # this can be a large payload, so we remove unneeded values and round the floats
     # to reduce the amount of data we need to send
-    props = []
+    props = {"classes": ordered}
+    for cls in ordered:
+        props[cls] = []
+    
     for feat in feats:
         prop = feat['properties']
+        cls = prop.pop(char_label)
         for k, v in prop.items():
-            if k != char_label:
-                prop[k] = round(v, 5)
+            prop[k] = round(v, 5)
         
-        props.append(prop)
+        props[cls].append(prop)
     
     return props
 
-def chot_box_charts(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> List[Dict[str, List[float]]]:
+def chot_box_charts(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, Dict[str, List[float]]]:
     return box_charts(uid, key, num_label, char_label, chot_imagery(roi, buff_dist))
 
-def clot_box_charts(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> List[Dict[str, List[float]]]:
+def clot_box_charts(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, Dict[str, List[float]]]:
     return box_charts(uid, key, num_label, char_label, clot_imagery(roi, buff_dist))
 
-def hhot_box_charts(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> List[Dict[str, List[float]]]:
+def hhot_box_charts(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, Dict[str, List[float]]]:
     return box_charts(uid, key, num_label, char_label, hhot_imagery(roi, buff_dist))
 
-def hlot_box_charts(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> List[Dict[str, List[float]]]:
+def hlot_box_charts(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, Dict[str, List[float]]]:
     return box_charts(uid, key, num_label, char_label, hlot_imagery(roi, buff_dist))
 
-def box_charts(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> List[Dict[str, List[float]]]:
+# Returns dict of class name to dict of band name to list of 5 values. Values are: [min, s1, mean, s2, max].
+# Also contains an ordered list of classes at the root under 'classes'
+def box_charts(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> Dict[str, Dict[str, List[float]]]:
     bands = img.bandNames().remove('B6')
     sample = sample_image(img, training_poly(uid, key, num_label), num_label, char_label)
     nums = sample.distinct(num_label).aggregate_array(num_label)
     chars = sample.distinct(char_label).aggregate_array(char_label)
     zipped = nums.zip(chars).sort(nums)
+    ordered = ordered_zipped(zipped)
     
-    def chart_data(cls: ee.List) -> ee.Dictionary:
+    def chart_data(cls: ee.List, prev: ee.Dictionary) -> ee.Dictionary:
         cls = ee.List(cls)
-        return ee.Dictionary().set(cls.get(1), box_chart_data(cls.get(0), sample, bands, num_label))
+        return ee.Dictionary(prev).set(cls.get(1), box_chart_data(sample.filter(ee.Filter.eq(num_label, cls.get(0))), bands))
     
-    return zipped.map(chart_data).getInfo()
+    d = zipped.iterate(chart_data, ee.Dictionary()).getInfo()
+    d["classes"] = ordered
+    return d
 
-def box_chart_data(cls: ee.Number, sample: ee.FeatureCollection, bands: ee.List, num_label: str) -> ee.Dictionary:
-    filtered = sample.filter(ee.Filter.eq(num_label, cls))
+def box_chart_data(filtered: ee.FeatureCollection, bands: ee.List) -> ee.Dictionary:
     dat = ee.Dictionary()
     dat = dat.set('mins', filtered.reduceColumns(ee.Reducer.min().forEach(bands), bands))
     dat = dat.set('maxs', filtered.reduceColumns(ee.Reducer.max().forEach(bands), bands))
     dat = dat.set('means', filtered.reduceColumns(ee.Reducer.mean().forEach(bands), bands))
     dat = dat.set('stds', filtered.reduceColumns(ee.Reducer.stdDev().forEach(bands), bands))
-
+    
     def rotate(band: ee.String, prev: ee.Dictionary) -> ee.Dictionary:
         mini = ee.Number(ee.Dictionary(dat.get('mins')).get(band))
         maxi = ee.Number(ee.Dictionary(dat.get('maxs')).get(band))
@@ -81,16 +91,29 @@ def box_chart_data(cls: ee.Number, sample: ee.FeatureCollection, bands: ee.List,
     
     return bands.iterate(rotate, ee.Dictionary())
 
-def chot_correlations(uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, list]:
+def ordered_classes(sample: ee.FeatureCollection, num_label: str, char_label: str) -> List[str]:
+    nums = sample.distinct(num_label).aggregate_array(num_label)
+    chars = sample.distinct(char_label).aggregate_array(char_label)
+    return ordered_zipped(nums.zip(chars).sort(nums))
+ 
+def ordered_zipped(zipped: ee.List) -> List[str]:
+    zipped = zipped.getInfo()
+    ordered = []
+    for z in zipped:
+        ordered.append(z[1])
+    
+    return ordered
+
+def chot_correlations(uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, List[float]]:
     return pearson_correlation(chot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
 
-def chot_correlations(uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, list]:
+def chot_correlations(uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, List[float]]:
     return pearson_correlation(clot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
 
-def hhot_correlations(uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, list]:
+def hhot_correlations(uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, List[float]]:
     return pearson_correlation(hhot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
 
-def hlot_correlations(uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, list]:
+def hlot_correlations(uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, List[float]]:
     return pearson_correlation(hlot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
 
 def training_poly(uid: str, key: str, num_label: str) -> ee.FeatureCollection:
@@ -105,33 +128,28 @@ def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, ch
         tileScale = 16
     )
 
-def pearson_correlation(img: ee.Image, t_poly: ee.FeatureCollection) -> Dict[str, list]:
+# Returns a dict of band names to list of correlation values. Values are correlation between the band and the band at the indexed position.
+# Also contains an ordered list of bands at the root under 'bands'
+def pearson_correlation(img: ee.Image, t_poly: ee.FeatureCollection) -> Dict[str, List[float]]:
     bands = img.bandNames().remove('B6')
-    corr = {'bands': []}
+    local_bands = bands.getInfo()
     
-    def row(band: str) -> ee.List:
-        return correlation_row(band, bands, img, t_poly)
+    corr = {"bands": local_bands}
+    for b in local_bands:
+        corr[b] = correlation_row(b, bands, img, t_poly)
     
-    matrix = bands.map(row).getInfo()
-    
-    for r in matrix:
-        band = r[0]
-        corr['bands'].append(band)
-        corr[band] = r[1:]
-
     return corr
 
-def correlation_row(band: str, bands: ee.List, img: ee.Image, t_poly: ee.FeatureCollection) -> ee.List:
-    out = ee.List([band])
+def correlation_row(band: str, bands: ee.List, img: ee.Image, t_poly: ee.FeatureCollection) -> List[float]:
     base = img.select([band], ['base'])
     
     def cell(b: str) -> ee.Number:
-        return correlation_cell(b, base, img, t_poly)
+        return correlation_cell(img.select([b]).addBands(base), t_poly)
     
-    return out.cat(bands.map(cell))
+    return bands.map(cell).getInfo()
 
-def correlation_cell(band: str, base: ee.Image, img: ee.Image, t_poly: ee.FeatureCollection) -> ee.Number:
-    return img.select([band]).addBands(base).reduceRegion(
+def correlation_cell(img: ee.Image, t_poly: ee.FeatureCollection) -> ee.Number:
+    return img.reduceRegion(
         reducer = ee.Reducer.pearsonsCorrelation(),
         geometry = t_poly,
         scale = 30,
