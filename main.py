@@ -141,6 +141,30 @@ def hlot_box_route(uid: str):
     content = request.json
     return jsonify(hlot_box_charts(uid, content["hist_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
 
+@app.route("/chot_scatter", methods=["POST"])
+@token_check
+def chot_scatter_route(uid: str):
+    content = request.json
+    return jsonify(chot_scatter(uid, content["cont_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+
+@app.route("/clot_scatter", methods=["POST"])
+@token_check
+def clot_scatter_route(uid: str):
+    content = request.json
+    return jsonify(clot_scatter(uid, content["cont_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+
+@app.route("/hhot_scatter", methods=["POST"])
+@token_check
+def hhot_scatter_route(uid: str):
+    content = request.json
+    return jsonify(hhot_scatter(uid, content["hist_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+
+@app.route("/hlot_scatter", methods=["POST"])
+@token_check
+def hlot_scatter_route(uid: str):
+    content = request.json
+    return jsonify(hlot_scatter(uid, content["hist_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--uid", help = "the uid to use in debug mode when auth isn't provided")

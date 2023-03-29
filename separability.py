@@ -4,6 +4,39 @@ from typing import Dict, List
 from roi import chot_imagery, clot_imagery, hhot_imagery, hlot_imagery
 from assets import asset_name
 
+def chot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> List[dict]:
+    return scatter_data(uid, key, num_label, char_label, chot_imagery(roi, buff_dist))
+
+def clot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> List[dict]:
+    return scatter_data(uid, key, num_label, char_label, clot_imagery(roi, buff_dist))
+
+def hhot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> List[dict]:
+    return scatter_data(uid, key, num_label, char_label, hhot_imagery(roi, buff_dist))
+
+def hlot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> List[dict]:
+    return scatter_data(uid, key, num_label, char_label, hlot_imagery(roi, buff_dist))
+
+def scatter_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> List[dict]:
+    bands = img.bandNames().remove('B6').add(char_label)
+    sample = sample_image(img, training_poly(uid, key, num_label), num_label, char_label)
+    feats = sample.select(
+        propertySelectors = bands,
+        retainGeometry = False,
+    ).toList(9999).getInfo()
+    
+    # this can be a large payload, so we remove unneeded values and round the floats
+    # to reduce the amount of data we need to send
+    props = []
+    for feat in feats:
+        prop = feat['properties']
+        for k, v in prop.items():
+            if k != char_label:
+                prop[k] = round(v, 5)
+        
+        props.append(prop)
+    
+    return props
+
 def chot_box_charts(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> List[Dict[str, List[float]]]:
     return box_charts(uid, key, num_label, char_label, chot_imagery(roi, buff_dist))
 
@@ -31,7 +64,7 @@ def box_charts(uid: str, key: str, num_label: str, char_label: str, img: ee.Imag
 
 def box_chart_data(cls: ee.Number, sample: ee.FeatureCollection, bands: ee.List, num_label: str) -> ee.Dictionary:
     filtered = sample.filter(ee.Filter.eq(num_label, cls))
-    dat = ee.Dictionary({})
+    dat = ee.Dictionary()
     dat = dat.set('mins', filtered.reduceColumns(ee.Reducer.min().forEach(bands), bands))
     dat = dat.set('maxs', filtered.reduceColumns(ee.Reducer.max().forEach(bands), bands))
     dat = dat.set('means', filtered.reduceColumns(ee.Reducer.mean().forEach(bands), bands))
@@ -46,7 +79,7 @@ def box_chart_data(cls: ee.Number, sample: ee.FeatureCollection, bands: ee.List,
         s2 = mean.add(std)
         return ee.Dictionary(prev).set(band, ee.List([mini, s1, mean, s2, maxi]))
     
-    return bands.iterate(rotate, ee.Dictionary({}))
+    return bands.iterate(rotate, ee.Dictionary())
 
 def chot_correlations(uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, list]:
     return pearson_correlation(chot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
