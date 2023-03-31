@@ -19,17 +19,18 @@ def hlot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict,
 # Returns dict of class name to list of dicts of band name to value. Values are reflectance for landsat, or index values.
 # Also contains an ordered list of classes at the root under 'classes'
 def scatter_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> Dict[str, List[Dict[str, float]]]:
-    bands = img.bandNames().remove('B6').add(char_label)
+    bands = img.bandNames().remove('B6')
+    lbands = bands.add(char_label)
     sample = sample_image(img, training_poly(uid, key, num_label), num_label, char_label)
     feats = sample.select(
-        propertySelectors = bands,
+        propertySelectors = lbands,
         retainGeometry = False,
     ).toList(9999).getInfo()
     ordered = ordered_classes(sample, num_label, char_label)
     
     # this can be a large payload, so we remove unneeded values and round the floats
     # to reduce the amount of data we need to send
-    props = {"classes": ordered}
+    props = {"classes": ordered, "bands": bands.getInfo()}
     for cls in ordered:
         props[cls] = []
     
@@ -71,6 +72,7 @@ def box_charts(uid: str, key: str, num_label: str, char_label: str, img: ee.Imag
     
     d = zipped.iterate(chart_data, ee.Dictionary()).getInfo()
     d["classes"] = ordered
+    d["bands"] = bands.getInfo()
     return d
 
 def box_chart_data(filtered: ee.FeatureCollection, bands: ee.List) -> ee.Dictionary:
@@ -133,26 +135,37 @@ def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, ch
 def pearson_correlation(img: ee.Image, t_poly: ee.FeatureCollection) -> Dict[str, List[float]]:
     bands = img.bandNames().remove('B6')
     local_bands = bands.getInfo()
+    midpoint = int(len(local_bands)/2)
+    half1 = bands.slice(0, midpoint)
+    half2 = bands.slice(midpoint)
     
     corr = {"bands": local_bands}
-    for b in local_bands:
-        corr[b] = correlation_row(b, bands, img, t_poly)
+    
+    matrix = correlation_rows(half1, bands, img, t_poly) + correlation_rows(half2, bands, img, t_poly)
+
+    for idx, r in enumerate(matrix):
+        corr[local_bands[idx]] = [round(elem, 3) for elem in r]
     
     return corr
 
-def correlation_row(band: str, bands: ee.List, img: ee.Image, t_poly: ee.FeatureCollection) -> List[float]:
+def correlation_rows(subset: ee.List, bands: ee.List, img: ee.Image, t_poly: ee.FeatureCollection) -> ee.List:
+    def row(band: ee.String) -> ee.List:
+        return correlation_row(band, bands, img, t_poly)
+
+    return subset.map(row).getInfo()
+
+def correlation_row(band: ee.String, bands: ee.List, img: ee.Image, t_poly: ee.FeatureCollection) -> ee.List:
     base = img.select([band], ['base'])
     
     def cell(b: str) -> ee.Number:
         return correlation_cell(img.select([b]).addBands(base), t_poly)
     
-    return bands.map(cell).getInfo()
+    return bands.map(cell)
 
 def correlation_cell(img: ee.Image, t_poly: ee.FeatureCollection) -> ee.Number:
     return img.reduceRegion(
         reducer = ee.Reducer.pearsonsCorrelation(),
         geometry = t_poly,
-        scale = 30,
-        maxPixels = 1e13,
-        tileScale = 4
+        scale = 90,
+        tileScale = 16
     ).get('correlation')
