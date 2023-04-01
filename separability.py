@@ -199,13 +199,15 @@ def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, ch
 def pearson_correlation(img: ee.Image, t_poly: ee.FeatureCollection) -> Dict[str, List[float]]:
     bands = img.bandNames().remove('B6')
     local_bands = bands.getInfo()
-    midpoint = int(len(local_bands)/2)
-    half1 = bands.slice(0, midpoint)
-    half2 = bands.slice(midpoint)
+    p1 = int(len(local_bands)/3)
+    p2 = p1 + p1
+    s1 = bands.slice(0, p1)
+    s2 = bands.slice(p1, p2)
+    s3 = bands.slice(p2)
     
     corr = {"bands": local_bands, "highly_correlated": 0.8, "moderately_correlated": 0.6}
     
-    matrix = correlation_rows(half1, bands, img, t_poly) + correlation_rows(half2, bands, img, t_poly)
+    matrix = correlation_rows(s1, bands, img, t_poly) + correlation_rows(s2, bands, img, t_poly) + correlation_rows(s3, bands, img, t_poly)
 
     for idx, r in enumerate(matrix):
         corr[local_bands[idx]] = [round(elem, 3) for elem in r]
@@ -230,6 +232,6 @@ def correlation_cell(img: ee.Image, t_poly: ee.FeatureCollection) -> ee.Number:
     return img.reduceRegion(
         reducer = ee.Reducer.pearsonsCorrelation(),
         geometry = t_poly,
-        scale = 90,
+        scale = 150,
         tileScale = 16
     ).get('correlation')
