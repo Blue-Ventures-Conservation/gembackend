@@ -66,14 +66,78 @@ def box_charts(uid: str, key: str, num_label: str, char_label: str, img: ee.Imag
     zipped = nums.zip(chars).sort(nums)
     ordered = ordered_zipped(zipped)
     
-    def chart_data(cls: ee.List, prev: ee.Dictionary) -> ee.Dictionary:
-        cls = ee.List(cls)
-        return ee.Dictionary(prev).set(cls.get(1), box_chart_data(sample.filter(ee.Filter.eq(num_label, cls.get(0))), bands))
+    local_bands = bands.getInfo()
+    d = ee.Dictionary()
+    for b in local_bands:
+        byClass = {}
+        for cls in ordered:
+            byClass[cls] = []
+        
+        d = d.set(b, byClass)
     
-    d = zipped.iterate(chart_data, ee.Dictionary()).getInfo()
-    d["classes"] = ordered
-    d["bands"] = bands.getInfo()
-    return d
+    def chart_data(cls: ee.List, outer: ee.Dictionary) -> ee.Dictionary:
+        cls = ee.List(cls)
+        data = ee.Dictionary(box_chart_data(sample.filter(ee.Filter.eq(num_label, cls.get(0))), bands))
+        
+        def boxes(band: ee.String, inner: ee.Dictionary) -> ee.Dictionary:
+            return box_chart_rotate(band, inner, data, cls.get(1))
+        
+        return data.keys().iterate(boxes, outer)
+    
+    byBand = zipped.iterate(chart_data, d).getInfo()
+    for band, bandDat in byBand.items():
+        seps = separability(bandDat)
+        byBand[band]["separability"] = seps
+    
+    byBand["classes"] = ordered
+    byBand["bands"] = local_bands
+    
+    return byBand
+
+def box_chart_rotate(band: ee.String, prev: ee.Dictionary, data: ee.Dictionary, cls: ee.String) -> ee.Dictionary:
+    vals = data.get(ee.String(band))
+    byClass = ee.Dictionary(prev).get(ee.String(band))
+    prev = ee.Dictionary(prev).set(ee.String(band), ee.Dictionary(byClass).set(cls, vals))
+    return prev
+
+def separability(bandDat: Dict[str, List[float]]) -> List[List[str]]:
+    done = []
+    seps = []
+    for k, v in bandDat.items():
+        done.append(k)
+        std1 = v[1]
+        std2 = v[3]
+        for kk, vv in bandDat.items():
+            if k == kk or kk in done:
+                continue
+            
+            std3 = vv[1]
+            std4 = vv[3]
+            
+            if not overgap(std1, std2, std3, std4):
+                seps.append([k, kk])
+    
+    return seps
+
+def overgap(std1, std2, std3, std4: float) -> bool:
+    gap1 = std2 - std1
+    gap2 = std4 - std3
+    if std2 >= std4 and std1 <= std4:
+        ol = std4 - std1
+        if std1 < std3:
+            ol = std4 - std3
+        return overlap(gap1, gap2, ol)
+    
+    if std2 <= std4 and std2 >= std3:
+        ol = std2 - std1
+        if std1 < std3:
+             ol = std2 - std3
+        return overlap(gap1, gap2, ol)
+    
+    return False
+
+def overlap(g1, g2, ol: float) -> bool:
+    return ol > (0.25 * g1) or ol > (0.25 * g2)
 
 def box_chart_data(filtered: ee.FeatureCollection, bands: ee.List) -> ee.Dictionary:
     dat = ee.Dictionary()
@@ -82,7 +146,7 @@ def box_chart_data(filtered: ee.FeatureCollection, bands: ee.List) -> ee.Diction
     dat = dat.set('means', filtered.reduceColumns(ee.Reducer.mean().forEach(bands), bands))
     dat = dat.set('stds', filtered.reduceColumns(ee.Reducer.stdDev().forEach(bands), bands))
     
-    def rotate(band: ee.String, prev: ee.Dictionary) -> ee.Dictionary:
+    def byBand(band: ee.String, prev: ee.Dictionary) -> ee.Dictionary:
         mini = ee.Number(ee.Dictionary(dat.get('mins')).get(band))
         maxi = ee.Number(ee.Dictionary(dat.get('maxs')).get(band))
         mean = ee.Number(ee.Dictionary(dat.get('means')).get(band))
@@ -91,7 +155,7 @@ def box_chart_data(filtered: ee.FeatureCollection, bands: ee.List) -> ee.Diction
         s2 = mean.add(std)
         return ee.Dictionary(prev).set(band, ee.List([mini, s1, mean, s2, maxi]))
     
-    return bands.iterate(rotate, ee.Dictionary())
+    return bands.iterate(byBand, ee.Dictionary())
 
 def ordered_classes(sample: ee.FeatureCollection, num_label: str, char_label: str) -> List[str]:
     nums = sample.distinct(num_label).aggregate_array(num_label)
@@ -139,7 +203,7 @@ def pearson_correlation(img: ee.Image, t_poly: ee.FeatureCollection) -> Dict[str
     half1 = bands.slice(0, midpoint)
     half2 = bands.slice(midpoint)
     
-    corr = {"bands": local_bands}
+    corr = {"bands": local_bands, "highly_correlated": 0.8, "moderately_correlated": 0.6}
     
     matrix = correlation_rows(half1, bands, img, t_poly) + correlation_rows(half2, bands, img, t_poly)
 
