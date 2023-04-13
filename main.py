@@ -97,73 +97,73 @@ def ls_imagery_route():
 @token_check
 def chot_corr_route(uid: str):
     content = request.json
-    return jsonify(chot_correlations(uid, content["cont_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
+    return jsonify(chot_correlations(uid, content["storage_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
 
 @app.route("/clot_corr", methods=["POST"])
 @token_check
 def clot_corr_route(uid: str):
     content = request.json
-    return jsonify(chot_correlations(uid, content["cont_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
+    return jsonify(chot_correlations(uid, content["storage_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
 
 @app.route("/hhot_corr", methods=["POST"])
 @token_check
 def hhot_corr_route(uid: str):
     content = request.json
-    return jsonify(chot_correlations(uid, content["hist_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
+    return jsonify(chot_correlations(uid, content["storage_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
 
 @app.route("/hlot_corr", methods=["POST"])
 @token_check
 def hlot_corr_route(uid: str):
     content = request.json
-    return jsonify(chot_correlations(uid, content["hist_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
+    return jsonify(chot_correlations(uid, content["storage_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
 
 @app.route("/chot_box", methods=["POST"])
 @token_check
 def chot_box_route(uid: str):
     content = request.json
-    return jsonify(chot_box_charts(uid, content["cont_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+    return jsonify(chot_box_charts(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
 
 @app.route("/clot_box", methods=["POST"])
 @token_check
 def clot_box_route(uid: str):
     content = request.json
-    return jsonify(clot_box_charts(uid, content["cont_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+    return jsonify(clot_box_charts(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
 
 @app.route("/hhot_box", methods=["POST"])
 @token_check
 def hhot_box_route(uid: str):
     content = request.json
-    return jsonify(hhot_box_charts(uid, content["hist_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+    return jsonify(hhot_box_charts(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
 
 @app.route("/hlot_box", methods=["POST"])
 @token_check
 def hlot_box_route(uid: str):
     content = request.json
-    return jsonify(hlot_box_charts(uid, content["hist_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+    return jsonify(hlot_box_charts(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
 
 @app.route("/chot_scatter", methods=["POST"])
 @token_check
 def chot_scatter_route(uid: str):
     content = request.json
-    return jsonify(chot_scatter(uid, content["cont_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+    return jsonify(chot_scatter(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
 
 @app.route("/clot_scatter", methods=["POST"])
 @token_check
 def clot_scatter_route(uid: str):
     content = request.json
-    return jsonify(clot_scatter(uid, content["cont_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+    return jsonify(clot_scatter(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
 
 @app.route("/hhot_scatter", methods=["POST"])
 @token_check
 def hhot_scatter_route(uid: str):
     content = request.json
-    return jsonify(hhot_scatter(uid, content["hist_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+    return jsonify(hhot_scatter(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
 
 @app.route("/hlot_scatter", methods=["POST"])
 @token_check
 def hlot_scatter_route(uid: str):
     content = request.json
-    return jsonify(hlot_scatter(uid, content["hist_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+    return jsonify(hlot_scatter(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

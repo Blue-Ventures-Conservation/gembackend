@@ -1,6 +1,5 @@
 {
-"cont_key": "TAB_CRA_2020_210224_binary",
-"hist_key": "TAB_CRA_2000_210301_binary",
+"storage_key": "TAB_CRA_2020_210224_binary",
 "num_label": "Classvalue",
 "char_label": "Classname",
 "roi": {
