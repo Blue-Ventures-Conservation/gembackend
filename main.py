@@ -1,5 +1,6 @@
 import os, argparse, ee
 
+from typing import Dict, List, Callable, Any
 from inspect import signature
 from functools import wraps
 from flask import Flask, request, abort, jsonify
@@ -96,74 +97,95 @@ def ls_imagery_route():
 @app.route("/chot_corr", methods=["POST"])
 @token_check
 def chot_corr_route(uid: str):
-    content = request.json
-    return jsonify(chot_correlations(uid, content["storage_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
+    return corr_rout(uid, request.json, chot_correlations)
 
 @app.route("/clot_corr", methods=["POST"])
 @token_check
 def clot_corr_route(uid: str):
-    content = request.json
-    return jsonify(chot_correlations(uid, content["storage_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
+    return corr_rout(uid, request.json, clot_correlations)
 
 @app.route("/hhot_corr", methods=["POST"])
 @token_check
 def hhot_corr_route(uid: str):
-    content = request.json
-    return jsonify(chot_correlations(uid, content["storage_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
+    return corr_rout(uid, request.json, hhot_correlations)
 
 @app.route("/hlot_corr", methods=["POST"])
 @token_check
 def hlot_corr_route(uid: str):
-    content = request.json
-    return jsonify(chot_correlations(uid, content["storage_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"]))
+    return corr_rout(uid, request.json, hlot_correlations)
+
+def corr_route(uid: str, content: Dict[str, Any], corr: Callable[[str, str, str, dict, int], Dict[str, List[float]]]):
+    try:
+        data = corr(uid, content["storage_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"])
+    except Exception as e:
+        if "Collection asset" in str(e) and "not found." in str(e):
+            return "", "400 missing asset"
+
+        return "", 500
+    
+    return jsonify(data)
 
 @app.route("/chot_box", methods=["POST"])
 @token_check
 def chot_box_route(uid: str):
-    content = request.json
-    return jsonify(chot_box_charts(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+    return box_route(uid, request.json, chot_box_charts)
 
 @app.route("/clot_box", methods=["POST"])
 @token_check
 def clot_box_route(uid: str):
-    content = request.json
-    return jsonify(clot_box_charts(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+    return box_route(uid, request.json, clot_box_charts)
 
 @app.route("/hhot_box", methods=["POST"])
 @token_check
 def hhot_box_route(uid: str):
-    content = request.json
-    return jsonify(hhot_box_charts(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+    return box_route(uid, request.json, hhot_box_charts)
 
 @app.route("/hlot_box", methods=["POST"])
 @token_check
 def hlot_box_route(uid: str):
-    content = request.json
-    return jsonify(hlot_box_charts(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+    return box_route(uid, request.json, hlot_box_charts)
+
+def box_route(uid: str, content: Dict[str, Any], box: Callable[[str, str, str, str, dict, int], Dict[str, Dict[str, List[float]]]]):
+    try:
+        data = box(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"])
+    except Exception as e:
+        if "Collection asset" in str(e) and "not found." in str(e):
+            return "", "400 missing asset" 
+
+        return "", 500
+    
+    return jsonify(data)
 
 @app.route("/chot_scatter", methods=["POST"])
 @token_check
 def chot_scatter_route(uid: str):
-    content = request.json
-    return jsonify(chot_scatter(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+    return scatter_route(uid, request.json, chot_scatter)
 
 @app.route("/clot_scatter", methods=["POST"])
 @token_check
 def clot_scatter_route(uid: str):
-    content = request.json
-    return jsonify(clot_scatter(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+    return scatter_route(uid, request.json, clot_scatter)
 
 @app.route("/hhot_scatter", methods=["POST"])
 @token_check
 def hhot_scatter_route(uid: str):
-    content = request.json
-    return jsonify(hhot_scatter(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+    return scatter_route(uid, request.json, hhot_scatter)
 
 @app.route("/hlot_scatter", methods=["POST"])
 @token_check
 def hlot_scatter_route(uid: str):
-    content = request.json
-    return jsonify(hlot_scatter(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"]))
+    return scatter_route(uid, request.json, hlot_scatter)
+
+def scatter_route(uid: str, content: Dict[str, Any], scatter: Callable[[str, str, str, str, dict, int], Dict[str, List[Dict[str, float]]]]):
+    try:
+        data = scatter(uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"])
+    except Exception as e:
+        if "Collection asset" in str(e) and "not found." in str(e):
+            return "", "400 missing asset" 
+
+        return "", 500
+    
+    return jsonify(data)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
