@@ -13,6 +13,12 @@ ls7_dataset = "LANDSAT/LE07/C02/T1_L2"
 ls8_dataset = "LANDSAT/LC08/C02/T1_L2"
 ls9_dataset = "LANDSAT/LC09/C02/T1_L2"
 
+class NoContemporaryImages(Exception):
+    pass
+
+class NoHistoricalImages(Exception):
+    pass
+
 def known_mangroves() -> ee.Image:
     return ee.ImageCollection("LANDSAT/MANGROVE_FORESTS").reduce(ee.Reducer.mean())
 
@@ -87,22 +93,16 @@ def area_chart(poly: dict) -> Dict[str, dict]:
 
     return {"sums": {"keys": list(sums.keys()), "vals": [int(x) for x in list(sums.values())]}, "buffers": {"keys": list(buffers.keys()), "vals": list(buffers.values())}}
 
-class NoContemporaryImages(Exception):
-    pass
-
-class NoHistoricalImages(Exception):
-    pass
-
 def visualize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
     try:
         hhot, hlot = hist_imagery(roi, buff_dist)
     except NoImages:
-        raise NoHistoricalImages("")
+        raise NoHistoricalImages()
     
     try:
         chot, clot = cont_imagery(roi, buff_dist)
     except NoImages:
-        raise NoContemporaryImages("")
+        raise NoContemporaryImages()
 
     vis = {'bands': ['B4', 'B5', 'B3'], 'min': 0, 'max': 0.27}
     
@@ -179,7 +179,7 @@ def get_imagery(buff_dist: int, indices: List[str], poly: dict, year1: int, year
     imgs = oli_imgs.merge(tm_imgs)
     
     if imgs.size().getInfo() <= 0:
-        raise NoImages("")
+        raise NoImages()
     
     imgs = imgs.map(apply_scale_factors).map(fix_float).map(doubleOO).map(cloud_mask)
     imgs = tide_bands(shore_refl(imgs, zone, poly))

@@ -1,24 +1,61 @@
 import ee
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
+from enum import Enum
 from roi import chot_imagery, clot_imagery, hhot_imagery, hlot_imagery
 from assets import asset_name
 
-def chot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, List[Dict[str, float]]]:
-    return scatter_data(uid, key, num_label, char_label, chot_imagery(roi, buff_dist))
+class MissingAsset(Exception):
+    pass
 
-def clot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, List[Dict[str, float]]]:
-    return scatter_data(uid, key, num_label, char_label, clot_imagery(roi, buff_dist))
+class InvalidTimePeriod(Exception):
+    pass
 
-def hhot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, List[Dict[str, float]]]:
-    return scatter_data(uid, key, num_label, char_label, hhot_imagery(roi, buff_dist))
+def sep_error(e: Exception) -> Exception:
+    estr = str(e)
+    if "Collection asset" in estr and "not found." in estr:
+        return MissingAsset()
+    else:
+        return e
 
-def hlot_scatter(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, List[Dict[str, float]]]:
-    return scatter_data(uid, key, num_label, char_label, hlot_imagery(roi, buff_dist))
+TimePeriod = Enum('TimePeriod', ['CONT_HIGH', 'CONT_LOW', 'HIST_HIGH', 'HIST_LOW'])
+
+def iToTP(i: int) -> TimePeriod:
+    try:
+        return TimePeriod(i)
+    except Exception:
+        raise InvalidTimePeriod()
+
+def training_poly(uid: str, key: str, num_label: str) -> ee.FeatureCollection:
+   name = asset_name(uid, key)
+   return ee.FeatureCollection(name).sort(num_label)
+
+def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, char_label: str) -> ee.FeatureCollection:
+    return img.sampleRegions(
+        collection = t_poly,
+        properties = [num_label, char_label],
+        scale = 30,
+        tileScale = 16
+    )
+
+def scatter_plot(tpi: int, uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, List[Dict[str, float]]]:
+    try:
+        tp = iToTP(i)
+        if tp == TimePeriod.CONT_HIGH:
+            return scatter_plot_data(uid, key, num_label, char_label, chot_imagery(roi, buff_dist))
+        if tp == TimePeriod.CONT_LOW:
+            return scatter_plot_data(uid, key, num_label, char_label, clot_imagery(roi, buff_dist))
+        if tp == TimePeriod.HIST_HIGH:
+            return scatter_plot_data(uid, key, num_label, char_label, hhot_imagery(roi, buff_dist))
+        if tp == TimePeriod.HIST_LOW:
+            return scatter_plot_data(uid, key, num_label, char_label, hlot_imagery(roi, buff_dist))
+    except Exception as e:
+        raise sep_error(e)
+
 
 # Returns dict of class name to list of dicts of band name to value. Values are reflectance for landsat, or index values.
 # Also contains an ordered list of classes at the root under 'classes'
-def scatter_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> Dict[str, List[Dict[str, float]]]:
+def scatter_plot_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> Dict[str, List[Dict[str, float]]]:
     bands = img.bandNames().remove('B6')
     lbands = bands.add(char_label)
     sample = sample_image(img, training_poly(uid, key, num_label), num_label, char_label)
@@ -44,21 +81,23 @@ def scatter_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Im
     
     return props
 
-def chot_box_charts(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, Dict[str, List[float]]]:
-    return box_charts(uid, key, num_label, char_label, chot_imagery(roi, buff_dist))
-
-def clot_box_charts(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, Dict[str, List[float]]]:
-    return box_charts(uid, key, num_label, char_label, clot_imagery(roi, buff_dist))
-
-def hhot_box_charts(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, Dict[str, List[float]]]:
-    return box_charts(uid, key, num_label, char_label, hhot_imagery(roi, buff_dist))
-
-def hlot_box_charts(uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, Dict[str, List[float]]]:
-    return box_charts(uid, key, num_label, char_label, hlot_imagery(roi, buff_dist))
+def box_charts(tpi: int, uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, Dict[str, List[float]]]:
+    try:
+        tp = iToTP(i)
+        if tp == TimePeriod.CONT_HIGH:
+            return box_charts_data(uid, key, num_label, char_label, chot_imagery(roi, buff_dist))
+        if tp == TimePeriod.CONT_LOW:
+            return box_charts_data(uid, key, num_label, char_label, clot_imagery(roi, buff_dist))
+        if tp == TimePeriod.HIST_HIGH:
+            return box_charts_data(uid, key, num_label, char_label, hhot_imagery(roi, buff_dist))
+        if tp == TimePeriod.HIST_LOW:
+            return box_charts_data(uid, key, num_label, char_label, hlot_imagery(roi, buff_dist))
+    except Exception as e:
+        raise sep_error(e)
 
 # Returns dict of class name to dict of band name to list of 5 values. Values are: [min, s1, mean, s2, max].
 # Also contains an ordered list of classes at the root under 'classes'
-def box_charts(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> Dict[str, Dict[str, List[float]]]:
+def box_charts_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> Dict[str, Dict[str, List[float]]]:
     bands = img.bandNames().remove('B6')
     sample = sample_image(img, training_poly(uid, key, num_label), num_label, char_label)
     nums = sample.distinct(num_label).aggregate_array(num_label)
@@ -170,29 +209,19 @@ def ordered_zipped(zipped: ee.List) -> List[str]:
     
     return ordered
 
-def chot_correlations(uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, List[float]]:
-    return pearson_correlation(chot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
-
-def chot_correlations(uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, List[float]]:
-    return pearson_correlation(clot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
-
-def hhot_correlations(uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, List[float]]:
-    return pearson_correlation(hhot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
-
-def hlot_correlations(uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, List[float]]:
-    return pearson_correlation(hlot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
-
-def training_poly(uid: str, key: str, num_label: str) -> ee.FeatureCollection:
-   name = asset_name(uid, key) 
-   return ee.FeatureCollection(name).sort(num_label)
-
-def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, char_label: str) -> ee.FeatureCollection:
-    return img.sampleRegions(
-        collection = t_poly,
-        properties = [num_label, char_label],
-        scale = 30,
-        tileScale = 16
-    )
+def correlation_matrix(tpi: int, uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, List[float]]:
+    try:
+        tp = iToTP(i)
+        if tp == TimePeriod.CONT_HIGH:
+            return pearson_correlation(chot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
+        if tp == TimePeriod.CONT_LOW:
+            return pearson_correlation(clot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
+        if tp == TimePeriod.HIST_HIGH:
+            return pearson_correlation(hhot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
+        if tp == TimePeriod.HIST_LOW:
+            return pearson_correlation(hlot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
+    except Exception as e:
+        raise sep_error(e)
 
 # Returns a dict of band names to list of correlation values. Values are correlation between the band and the band at the indexed position.
 # Also contains an ordered list of bands at the root under 'bands'
