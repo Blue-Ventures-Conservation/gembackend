@@ -1,5 +1,7 @@
 import os, argparse, ee
 
+import logging
+import pprint
 from typing import Dict, List, Callable, Any
 from inspect import signature
 from functools import wraps
@@ -99,7 +101,7 @@ def box_route(uid: str):
         content = request.json
         data = box_charts(content["time_period"], uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
-        return "", error_check(e)
+        return "", error_check("/box_chart", content, e)
     
     return jsonify(data)
 
@@ -110,7 +112,7 @@ def scatter_route(uid: str):
         content = request.json
         data = scatter_chart(content["time_period"], uid, content["storage_key"], content["num_label"], content['char_label'], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
-        return "", error_check(e)
+        return "", error_check("/scatter_chart", content, e)
     
     return jsonify(data)
 
@@ -121,11 +123,11 @@ def corr_route(uid: str):
         content = request.json
         data = correlation_matrix(content["time_period"], uid, content["storage_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
-        return "", error_check(e)
+        return "", error_check("/correlation_chart", contnet, e)
     
     return jsonify(data)
 
-def error_check(e: Exception) -> str:
+def error_check(route: str, content: dict, e: Exception) -> str:
     t = type(e)
     if t is NoContemporaryImages:
         return "400 no contemporary images"
@@ -135,8 +137,9 @@ def error_check(e: Exception) -> str:
         return "400 missing asset"
     elif t is InvalidTimePeriod:
         return "400 invalid time period"
-    
-    return "500"
+    else:
+        logging.error("Uncaught exception: {}:\n\n{}\n\n{}".format(route, pprint.pformat(content), e))
+        return "500"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

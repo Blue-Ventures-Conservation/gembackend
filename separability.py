@@ -38,24 +38,24 @@ def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, ch
         tileScale = 16
     )
 
-def scatter_plot(tpi: int, uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, List[Dict[str, float]]]:
+def scatter_chart(tpi: int, uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, List[Dict[str, float]]]:
     try:
-        tp = iToTP(i)
+        tp = iToTP(tpi)
         if tp == TimePeriod.CONT_HIGH:
-            return scatter_plot_data(uid, key, num_label, char_label, chot_imagery(roi, buff_dist))
+            return scatter_chart_data(uid, key, num_label, char_label, chot_imagery(roi, buff_dist))
         if tp == TimePeriod.CONT_LOW:
-            return scatter_plot_data(uid, key, num_label, char_label, clot_imagery(roi, buff_dist))
+            return scatter_chart_data(uid, key, num_label, char_label, clot_imagery(roi, buff_dist))
         if tp == TimePeriod.HIST_HIGH:
-            return scatter_plot_data(uid, key, num_label, char_label, hhot_imagery(roi, buff_dist))
+            return scatter_chart_data(uid, key, num_label, char_label, hhot_imagery(roi, buff_dist))
         if tp == TimePeriod.HIST_LOW:
-            return scatter_plot_data(uid, key, num_label, char_label, hlot_imagery(roi, buff_dist))
+            return scatter_chart_data(uid, key, num_label, char_label, hlot_imagery(roi, buff_dist))
     except Exception as e:
         raise sep_error(e)
 
 
 # Returns dict of class name to list of dicts of band name to value. Values are reflectance for landsat, or index values.
 # Also contains an ordered list of classes at the root under 'classes'
-def scatter_plot_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> Dict[str, List[Dict[str, float]]]:
+def scatter_chart_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> Dict[str, List[Dict[str, float]]]:
     bands = img.bandNames().remove('B6')
     lbands = bands.add(char_label)
     sample = sample_image(img, training_poly(uid, key, num_label), num_label, char_label)
@@ -83,7 +83,7 @@ def scatter_plot_data(uid: str, key: str, num_label: str, char_label: str, img: 
 
 def box_charts(tpi: int, uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, Dict[str, List[float]]]:
     try:
-        tp = iToTP(i)
+        tp = iToTP(tpi)
         if tp == TimePeriod.CONT_HIGH:
             return box_charts_data(uid, key, num_label, char_label, chot_imagery(roi, buff_dist))
         if tp == TimePeriod.CONT_LOW:
@@ -211,7 +211,7 @@ def ordered_zipped(zipped: ee.List) -> List[str]:
 
 def correlation_matrix(tpi: int, uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, List[float]]:
     try:
-        tp = iToTP(i)
+        tp = iToTP(tpi)
         if tp == TimePeriod.CONT_HIGH:
             return pearson_correlation(chot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
         if tp == TimePeriod.CONT_LOW:
