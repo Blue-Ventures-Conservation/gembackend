@@ -14,7 +14,6 @@ COPY roi.py ./
 COPY assets.py ./
 COPY separability.py ./
 COPY requirements.txt ./
-COPY firebase_service_account.json ./
 
 # Install production dependencies.
 RUN pip install --no-cache-dir -r requirements.txt
