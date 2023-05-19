@@ -48,3 +48,17 @@ https://cloud.google.com/earth-engine
 
 This will enable the Google Earth Engine API for the project, and create a project in Google Earth Engine with the same name, and an assets folder:
 `projects/project_name/assets`
+
+### Cloud Run Deploy
+
+We run the server in GCloud's [Cloud Run service](https://cloud.google.com/run), which is a serverless technology that should save money
+when the GEM is not in use, which should be most of the time.
+
+We build and deploy using the `gcloud` cli, essentially following the instructions [here](https://firebase.google.com/docs/hosting/cloud-run#python).
+
+The Cloud Run service is called `gembackend`, managed under the Firebase project `GEM Project`. This project is owned by `courtland.fowler@blueventures.org`.
+
+The only changes from the default settings for this service are lengthening the timeout from 300 to 600 seconds, and setting the firebase sdk admin service account
+as the service account for the service under the security tab when editing and deploying.
+
+Cloud Run creates a service URL for the service. This URL is probably safe to deploy with for now.
