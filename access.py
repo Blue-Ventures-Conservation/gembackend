@@ -29,6 +29,8 @@ class Accessor:
             self._get_lists()
 
     def _get_lists(self):
+        # this makes 2 requests, because bucket.list_blobs only lists the next layer of folders one depth beyond the prefix given
+        # so using that funciton, it doesn;t seem to be possible to get all the blobs below allowed and blocked folders
         self._allowed = subfolders(storage_bucket, allowed_prefix)
         self._blocked = subfolders(storage_bucket, blocked_prefix)
         self._timestamp = time.time()

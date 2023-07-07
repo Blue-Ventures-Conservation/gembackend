@@ -38,16 +38,21 @@ curl -X POST -H "Content-Type: application/json" -d @roi_input.json http://local
 
 The backend uses a Firebase Admin SDK service account for pretty much everything. When Firebase is setup on a project, this service account is created automatically.
 
-We manually create the credentials for this service account, and that is what is in the `firebase_service_account.json` file referenced in a few places.
+We manually create the credentials for this service account in the form of a `firebase_service_account.json` file that is added to gitignore and should never be committed to git.
 This file can only be downloaded once, but it is also available in Google Cloud's Secret Manager, which is in the Security section of the interface.
 
-In addition to creating the credentials, we also edit the roles for this principal in IAM by add the role: `Earth Engine Resource Admin`
+The service account credentials file `firebase_service_account.json` is only used when running the server locally. In production, these credentials are avilable to the running
+service automatically and the JSON file is not included in the Dockerfile for this reason (see the `Cloud Run Deploy` section below for more).
+
+In addition to creating the credentials, we also edit the roles for this principal in IAM to add the role: `Earth Engine Resource Admin`
 
 Earth Engine itself also wants to know about your cloud project, and you can link them up here:
 https://cloud.google.com/earth-engine
 
-This will enable the Google Earth Engine API for the project, and create a project in Google Earth Engine with the same name, and an assets folder:
-`projects/project_name/assets`
+This will enable the Google Earth Engine API for the project, and create a project in Google Earth Engine with the same project ID, and an assets folder:
+`projects/{PROJECT_ID}/assets`
+
+To get the `PROJECT_ID`, view project settings in the firebase console.
 
 ### Cloud Run Deploy
 
