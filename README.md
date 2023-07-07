@@ -56,6 +56,20 @@ when the GEM is not in use, which should be most of the time.
 
 We build and deploy using the `gcloud` cli, essentially following the instructions [here](https://firebase.google.com/docs/hosting/cloud-run#python).
 
+To get the `PROJECT_ID`, view project settings in the firebase console.
+
+From the root directory that contains the Dockerfile, build the project and submit it to GCloud Container Registry:
+```
+gcloud builds submit --tag gcr.io/{PROJECT_ID}/gembackend
+```
+
+And then to deploy to cloud run:
+```
+gcloud run deploy --image gcr.io/{PROJECT_ID}/gembackend
+```
+
+We currently use `me-west1` for the location of this deploy, which is the closest location to Eastern Africa and Madagascar.
+
 The Cloud Run service is called `gembackend`, managed under the Firebase project `GEM Project`. This project is owned by `courtland.fowler@blueventures.org`.
 
 The only changes from the default settings for this service are lengthening the timeout from 300 to 600 seconds, and setting the firebase sdk admin service account

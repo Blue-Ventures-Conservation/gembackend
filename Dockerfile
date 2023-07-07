@@ -9,6 +9,8 @@ ENV PYTHONUNBUFFERED True
 ENV APP_HOME /app
 WORKDIR $APP_HOME
 COPY main.py ./
+COPY access.py ./
+COPY project.py ./
 COPY roi.py ./
 COPY assets.py ./
 COPY separability.py ./

@@ -2,14 +2,15 @@ import ee, logging
 
 from typing import Tuple
 from time import sleep
+import project
 
-asset_users_path = 'projects/gem-project-378721/assets/users/'
+asset_users_path = 'projects/{project_id}/assets/users/'
 asset_uid_path = asset_users_path+'{uid}'
 asset_users_table_path = asset_users_path+'{uid}/{key}'
-asset_user_shps = 'gs://gem-project-378721.appspot.com/users/{uid}/shps/{key}.zip'
+asset_user_shps = 'gs://{project_id}.appspot.com/users/{uid}/shps/{key}.zip'
 
 def create_user_asset_folder(uid: str) -> bool:
-    path = asset_uid_path.format(uid = uid)
+    path = asset_uid_path.format(project_id=project.project_id, uid = uid)
     if folder_exists(path):
         return True
     
@@ -31,7 +32,7 @@ def upload_table_asset(uid: str, key: str) -> Tuple[str, bool]:
         return "", True
 
     try:
-        shp = asset_user_shps.format(uid = uid, key = key)
+        shp = asset_user_shps.format(project_id=project.project_id, uid = uid, key = key)
         result = ee.data.startTableIngestion(request_id = ee.data.newTaskId()[0], params = {'name': name, 'sources': [{'uris': [shp], 'charset': 'UTF-8'}]})
         return result['name'], True
     except:
@@ -91,4 +92,4 @@ def folder_exists(path: str) -> bool:
         return False
 
 def asset_name(uid: str, key: str) -> str:
-    return asset_users_table_path.format(uid = uid, key = key)
+    return asset_users_table_path.format(project_id=project.project_id, uid = uid, key = key)
