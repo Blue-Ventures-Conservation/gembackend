@@ -1,10 +1,13 @@
 import ee
+import time
 from typing import Dict, List, Tuple
+from project import tile_timeout
 
 buffers = {
     '1 km': 1000, '2.5 km': 2500, '5 km': 5000, '7.5 km': 7500, '10 km': 10000, '12.5 km': 12500,
     '15 km': 15000, '17.5 km': 17500, '20 km': 20000, '22.5 km': 22500, '25 km': 25000
 }
+default_indices = ["CMRI", "MMRI", "MNDWI", "SAVI"]
 cloudCoverLimit = 15
 tidalZone = 1000
 ls4_dataset = "LANDSAT/LT04/C02/T1_L2"
@@ -115,7 +118,9 @@ def visualize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
         "chot_url": chot_url,
         "clot_url": clot_url,
         "hhot_url": hhot_url,
-        "hlot_url": hlot_url
+        "hlot_url": hlot_url,
+        "created_at": int(time.time()),
+        "timeout": tile_timeout
     }
 
 def final_mask(buff_dist: int, poly: dict, clot: ee.Image, hlot: ee.Image) -> ee.Image:
@@ -147,10 +152,10 @@ def hlot_imagery(roi: dict, buff_dist: int) -> ee.ImageCollection:
     return hlot
 
 def cont_imagery(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
-    return get_imagery(buff_dist, roi["indices"], roi["polygon"], roi["cont_year_start"], roi["cont_year_end"], roi["cont_month_start"], roi["cont_month_end"])
+    return get_imagery(buff_dist, roi.get("indices", default_indices), roi["polygon"], roi["cont_year_start"], roi["cont_year_end"], roi["cont_month_start"], roi["cont_month_end"])
     
 def hist_imagery(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
-    return get_imagery(buff_dist, roi["indices"], roi["polygon"], roi["hist_year_start"], roi["hist_year_end"], roi["hist_month_start"], roi["hist_month_end"])
+    return get_imagery(buff_dist, roi.get("indices", default_indices), roi["polygon"], roi["hist_year_start"], roi["hist_year_end"], roi["hist_month_start"], roi["hist_month_end"])
     
 class NoImages(Exception):
     pass
