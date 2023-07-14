@@ -205,6 +205,10 @@ def get_imagery(buff_dist: int, indices: List[str], poly: dict, year1: int, year
         elif idx == 'SAVI':
             high_tide = add_savi(high_tide)
             low_tide = add_savi(low_tide)
+
+    # rename bands to human friendly names and ditch B6 (heat/LWIR)
+    high_tide = high_tide.select(['B1','B2','B3','B4','B5','B7'], ['Blue', 'Green', 'Red', 'Near IR', 'Shortwave IR 1', 'Shortwave IR 2'])
+    low_tide = low_tide.select(['B1','B2','B3','B4','B5','B7'], ['Blue', 'Green', 'Red', 'Near IR', 'Shortwave IR 1', 'Shortwave IR 2'])
     
     return high_tide.float().clip(poly), low_tide.float().clip(poly)
 
