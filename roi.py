@@ -57,9 +57,12 @@ def topo_mask(dsm: ee.Image, mangs: ee.Image) -> ee.Image:
 def coastline(poly: dict) -> ee.Geometry:
     # use the roi to clip the world boundary polygons
     area = ee.FeatureCollection('USDOS/LSIB/2013').filterBounds(ee.Geometry(poly)).geometry()
+
+    def geom_coords(geo: ee.Geometry) -> ee.List:
+        return ee.Geometry(geo).coordinates()
     
-    # convert the polygon to a coordinate list
-    area_coords = area.dissolve().coordinates().flatten()
+    # convert the geometries to a coordinate list
+    area_coords = area.geometries().map(geom_coords).flatten()
     # use the coordinates to create a sting geometry
     area_point = ee.Geometry.MultiPoint(area_coords)
     
