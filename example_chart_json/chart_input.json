@@ -14,9 +14,6 @@
   "hist_year_end":2001,
   "hist_month_start":6,
   "hist_month_end":8,
-  "indices":[
-    "CMRI"
-  ],
   "polygon":{
     "type":"Polygon",
     "coordinates":[

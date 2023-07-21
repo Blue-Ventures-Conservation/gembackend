@@ -109,8 +109,9 @@ def visualize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
         chot, clot = cont_imagery(roi, buff_dist)
     except NoImages:
         raise NoContemporaryImages()
-
-    vis = {'bands': ['B4', 'B5', 'B3'], 'min': 0, 'max': 0.27}
+    
+    # B4, B5, B3 false color composite
+    vis = {'bands': ['Near IR', 'Shortwave IR 1', 'Red'], 'min': 0, 'max': 0.27}
     
     chot_url = chot.getMapId(vis)["tile_fetcher"].url_format
     clot_url = clot.getMapId(vis)["tile_fetcher"].url_format
@@ -195,23 +196,31 @@ def get_imagery(buff_dist: int, indices: List[str], poly: dict, year1: int, year
     high_tide = ee.ImageCollection(imgs).qualityMosaic("MNDWI").select(['B1','B2','B3','B4','B5','B6','B7'])
     low_tide = ee.ImageCollection(imgs).qualityMosaic("inv_MNDWI").select(['B1','B2','B3','B4','B5','B6','B7'])
 
+    known_indices = []
+
     for idx in indices:
         if idx == 'CMRI':
             high_tide = add_cmri(high_tide)
             low_tide = add_cmri(low_tide)
+            known_indices.append('CMRI')
         elif idx == 'MMRI':
             high_tide = add_mmri(high_tide)
             low_tide = add_mmri(low_tide)
+            known_indices.append('MMRI')
         elif idx == 'MNDWI':
             high_tide = add_mndwi(high_tide)
             low_tide = add_mndwi(low_tide)
+            known_indices.append('MNDWI')
         elif idx == 'SAVI':
             high_tide = add_savi(high_tide)
             low_tide = add_savi(low_tide)
+            known_indices.append('SAVI')
 
     # rename bands to human friendly names and ditch B6 (heat/LWIR)
-    high_tide = high_tide.select(['B1','B2','B3','B4','B5','B7'], ['Blue', 'Green', 'Red', 'Near IR', 'Shortwave IR 1', 'Shortwave IR 2'])
-    low_tide = low_tide.select(['B1','B2','B3','B4','B5','B7'], ['Blue', 'Green', 'Red', 'Near IR', 'Shortwave IR 1', 'Shortwave IR 2'])
+    current_bands = ['B1','B2','B3','B4','B5','B7'] + known_indices
+    renamed_bands = ['Blue', 'Green', 'Red', 'Near IR', 'Shortwave IR 1', 'Shortwave IR 2'] + known_indices
+    high_tide = high_tide.select(current_bands, renamed_bands)
+    low_tide = low_tide.select(current_bands, renamed_bands)
     
     return high_tide.float().clip(poly), low_tide.float().clip(poly)
 

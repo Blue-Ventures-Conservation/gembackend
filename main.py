@@ -98,7 +98,7 @@ def ls_imagery_route():
         content = request.json
         visuals = visualize_imagery(content, content["buff_dist"])
     except Exception as e:
-        return "", error_check(e)
+        return "", error_check("/ls_imagery", content, e)
     
     return jsonify(visuals)
 

@@ -3,20 +3,10 @@ from typing import Dict, List, Tuple
 
 from enum import Enum
 from roi import chot_imagery, clot_imagery, hhot_imagery, hlot_imagery
-from assets import asset_name
-
-class MissingAsset(Exception):
-    pass
+from assets import asset_error, training_poly
 
 class InvalidTimePeriod(Exception):
     pass
-
-def sep_error(e: Exception) -> Exception:
-    estr = str(e)
-    if "Collection asset" in estr and "not found." in estr:
-        return MissingAsset()
-    else:
-        return e
 
 TimePeriod = Enum('TimePeriod', ['CONT_HIGH', 'CONT_LOW', 'HIST_HIGH', 'HIST_LOW'])
 
@@ -25,10 +15,6 @@ def iToTP(i: int) -> TimePeriod:
         return TimePeriod(i)
     except Exception:
         raise InvalidTimePeriod()
-
-def training_poly(uid: str, key: str, num_label: str) -> ee.FeatureCollection:
-   name = asset_name(uid, key)
-   return ee.FeatureCollection(name).sort(num_label)
 
 def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, char_label: str) -> ee.FeatureCollection:
     return img.sampleRegions(
@@ -50,7 +36,7 @@ def scatter_chart(tpi: int, uid: str, key: str, num_label: str, char_label: str,
         if tp == TimePeriod.HIST_LOW:
             return scatter_chart_data(uid, key, num_label, char_label, hlot_imagery(roi, buff_dist))
     except Exception as e:
-        raise sep_error(e)
+        raise asset_error(e)
 
 
 # Returns dict of class name to list of dicts of band name to value. Values are reflectance for landsat, or index values.
@@ -93,7 +79,7 @@ def box_charts(tpi: int, uid: str, key: str, num_label: str, char_label: str, ro
         if tp == TimePeriod.HIST_LOW:
             return box_charts_data(uid, key, num_label, char_label, hlot_imagery(roi, buff_dist))
     except Exception as e:
-        raise sep_error(e)
+        raise asset_error(e)
 
 # Returns dict of class name to dict of band name to list of 5 values. Values are: [min, s1, mean, s2, max].
 # Also contains an ordered list of classes at the root under 'classes'
@@ -221,7 +207,7 @@ def correlation_matrix(tpi: int, uid: str, key: str, num_label: str, roi: dict, 
         if tp == TimePeriod.HIST_LOW:
             return pearson_correlation(hlot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
     except Exception as e:
-        raise sep_error(e)
+        raise asset_error(e)
 
 # Returns a dict of band names to list of correlation values. Values are correlation between the band and the band at the indexed position.
 # Also contains an ordered list of bands at the root under 'bands'

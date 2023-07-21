@@ -9,6 +9,20 @@ asset_uid_path = asset_users_path+'{uid}'
 asset_users_table_path = asset_users_path+'{uid}/{key}'
 asset_user_shps = 'gs://{project_id}.appspot.com/users/{uid}/shps/{key}.zip'
 
+class MissingAsset(Exception):
+    pass
+
+def asset_error(e: Exception) -> Exception:
+    estr = str(e)
+    if "Collection asset" in estr and "not found." in estr:
+        return MissingAsset()
+    else:
+        return e
+
+def training_poly(uid: str, key: str, num_label: str) -> ee.FeatureCollection:
+   name = asset_name(uid, key)
+   return ee.FeatureCollection(name).sort(num_label)
+
 def create_user_asset_folder(uid: str) -> bool:
     path = asset_uid_path.format(project_id=project.project_id, uid = uid)
     if folder_exists(path):
