@@ -8,8 +8,9 @@ buffers = {
     '15 km': 15000, '17.5 km': 17500, '20 km': 20000, '22.5 km': 22500, '25 km': 25000
 }
 default_indices = ["CMRI", "MMRI", "MNDWI", "SAVI"]
-cloudCoverLimit = 15
-tidalZone = 1000
+cloud_cover_limit = 15
+tidal_zone = 1000
+default_min_avg = 0.75
 ls4_dataset = "LANDSAT/LT04/C02/T1_L2"
 ls5_dataset = "LANDSAT/LT05/C02/T1_L2"
 ls7_dataset = "LANDSAT/LE07/C02/T1_L2"
@@ -51,7 +52,6 @@ def topo_mask(dsm: ee.Image, mangs: ee.Image) -> ee.Image:
     slp_val = ee.Image.constant(mang_slope.get('slope'))
 
     return dsm.select('elev').lte(el_val).And(dsm.select('slope').lte(slp_val)).double()
-
 
 # roi here should the dict equivalent of a geojson polygon
 def coastline(poly: dict) -> ee.Geometry:
@@ -133,8 +133,8 @@ def final_mask(buff_dist: int, poly: dict, clot: ee.Image, hlot: ee.Image) -> ee
     mangs = known_mangroves().clip(poly)
     tmask = topo_mask(topo_dsm(), mangs)
 
-    mndwi_cont = clot.normalizedDifference(['B5', 'B2']).gte(0.09)
-    mndwi_hist = hlot.normalizedDifference(['B5', 'B2']).gte(0.09)
+    mndwi_cont = add_mndwi(clot).lt(0.09)
+    mndwi_hist = add_mndwi(hlot).lt(0.09)
     h2o_mask = mndwi_cont.add(mndwi_hist).gt(1)
 
     return h2o_mask.multiply(tmask).eq(1)
@@ -156,18 +156,18 @@ def hlot_imagery(roi: dict, buff_dist: int) -> ee.ImageCollection:
     return hlot
 
 def cont_imagery(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
-    return get_imagery(buff_dist, roi.get("indices", default_indices), roi["polygon"], roi["cont_year_start"], roi["cont_year_end"], roi["cont_month_start"], roi["cont_month_end"])
+    return get_imagery(buff_dist, roi.get("indices", default_indices), roi["polygon"], roi["cont_year_start"], roi["cont_year_end"], roi["cont_month_start"], roi["cont_month_end"], roi.get("min_avg", default_min_avg))
     
 def hist_imagery(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
-    return get_imagery(buff_dist, roi.get("indices", default_indices), roi["polygon"], roi["hist_year_start"], roi["hist_year_end"], roi["hist_month_start"], roi["hist_month_end"])
+    return get_imagery(buff_dist, roi.get("indices", default_indices), roi["polygon"], roi["hist_year_start"], roi["hist_year_end"], roi["hist_month_start"], roi["hist_month_end"], roi.get("min_avg", default_min_avg))
     
 class NoImages(Exception):
     pass
 
-def get_imagery(buff_dist: int, indices: List[str], poly: dict, year1: int, year2: int, month1: int, month2: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
+def get_imagery(buff_dist: int, indices: List[str], poly: dict, year1: int, year2: int, month1: int, month2: int, min_avg: float = -1.0) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
     coast = coastline(poly)
     poly = coast.buffer(buff_dist)
-    zone = coast.simplify(500).buffer(tidalZone).simplify(500)
+    zone = coast.simplify(500).buffer(tidal_zone).simplify(500)
     
     ls4 = ls4_imagery(poly, year1, year2, month1, month2)
     ls5 = ls5_imagery(poly, year1, year2, month1, month2)
@@ -191,7 +191,7 @@ def get_imagery(buff_dist: int, indices: List[str], poly: dict, year1: int, year
         raise NoImages()
     
     imgs = imgs.map(apply_scale_factors).map(fix_float).map(doubleOO).map(cloud_mask)
-    imgs = tide_bands(shore_refl(imgs, zone, poly))
+    imgs = tide_bands(shore_refl(imgs, zone, poly, min_avg))
     
     high_tide = ee.ImageCollection(imgs).qualityMosaic("MNDWI").select(['B1','B2','B3','B4','B5','B6','B7'])
     low_tide = ee.ImageCollection(imgs).qualityMosaic("inv_MNDWI").select(['B1','B2','B3','B4','B5','B6','B7'])
@@ -224,7 +224,6 @@ def get_imagery(buff_dist: int, indices: List[str], poly: dict, year1: int, year
     
     return high_tide.float().clip(poly), low_tide.float().clip(poly)
 
-
 def ls4_imagery(poly: ee.Geometry, year1: int, year2: int, month1: int, month2: int) -> ee.ImageCollection:
     return filtered_ls(ls4_dataset, poly, year1, year2, month1, month2)
 
@@ -242,7 +241,7 @@ def ls9_imagery(poly: ee.Geometry, year1: int, year2: int, month1: int, month2: 
 
 def filtered_ls(dataset: str, poly: ee.Geometry, year1: int, year2: int, month1: int, month2: int) -> ee.ImageCollection:
     return ee.ImageCollection(dataset).filterBounds(poly) \
-        .filterMetadata("CLOUD_COVER", "not_greater_than", cloudCoverLimit) \
+        .filterMetadata("CLOUD_COVER", "not_greater_than", cloud_cover_limit) \
         .filterDate(f'{year1}-01-01', f'{year2}-12-31') \
         .filter(ee.Filter.calendarRange(month1, month2, "month"))
     
@@ -277,7 +276,7 @@ def cloud_mask(img: ee.Image) -> ee.Image:
     opened = mask.focalMin(kernel = kernel, iterations = 1)
     return img.updateMask(opened)
 
-def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry) -> ee.ImageCollection:
+def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry, min_avg: float = -1.0) -> ee.ImageCollection:
     # import the PLASAT dataset and create an land mask
     land_mask = ee.ImageCollection('JAXA/ALOS/PALSAR/YEARLY/SAR') \
             .filter(ee.Filter.date('2017-01-01', '2018-01-01')) \
@@ -285,7 +284,7 @@ def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry) -
             .select('qa').eq(50)
     
     def mndwi_map(img: ee.Image) -> ee.Image:
-        mndwi = ee.Image(img).expression('(B2 - B5)/(B2 + B5)', {'B2': img.select('B2'), 'B5': img.select('B5')}).rename(["MNDWI"])
+        mndwi = add_mndwi(img)
         # use the MODIS land/water mask and cloud mask to mask out the land
         masked_mndwi = mndwi.updateMask(land_mask)
         # reduce the image to the buffered shoreline, calculating a MNDWI
@@ -303,7 +302,7 @@ def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry) -
         # input that value into the image metadata as the property 'MNDWI'
         return img.set('MNDWI', ee.Number(cum_sum))
     
-    return ee.ImageCollection(imgs).map(mndwi_map)
+    return ee.ImageCollection(imgs).map(mndwi_map).filter(ee.Filter.gte("MNDWI", min_avg))
 
 def tide_bands(imgs: ee.ImageCollection) -> ee.ImageCollection:
     # add a band to each image called MNDWI (created from the shoreRefl function)
