@@ -10,7 +10,7 @@ buffers = {
 default_indices = ["CMRI", "MMRI", "MNDWI", "SAVI"]
 cloud_cover_limit = 15
 tidal_zone = 1000
-default_min_avg = 0.75
+default_min_avg = -1.0
 ls4_dataset = "LANDSAT/LT04/C02/T1_L2"
 ls5_dataset = "LANDSAT/LT05/C02/T1_L2"
 ls7_dataset = "LANDSAT/LE07/C02/T1_L2"
@@ -25,33 +25,6 @@ class NoHistoricalImages(Exception):
 
 def known_mangroves() -> ee.Image:
     return ee.ImageCollection("LANDSAT/MANGROVE_FORESTS").reduce(ee.Reducer.mean())
-
-def topo_dsm() -> ee.Image:
-    dsm = ee.Image("JAXA/ALOS/AW3D30/V2_2").select("AVE_DSM").rename("elev")
-    slp_img = ee.Terrain.slope(ee.Image(dsm).select("elev")).double().rename("slope")
-    return dsm.addBands(slp_img)
-
-def topo_mask(dsm: ee.Image, mangs: ee.Image) -> ee.Image:
-    mang_elv = dsm.select('elev').updateMask(mangs).reduceRegion(
-            reducer = ee.Reducer.percentile(percentiles = [99]),
-            geometry = mangs.geometry(),
-            scale = 30,
-            maxPixels = 1e12,
-            bestEffort = True
-    )
-
-    mang_slope = dsm.select('slope').updateMask(mangs).reduceRegion(
-            reducer = ee.Reducer.percentile(percentiles = [99]),
-            geometry = mangs.geometry(),
-            scale = 30,
-            maxPixels = 1e12,
-            bestEffort = True
-    )
-
-    el_val = ee.Image.constant(mang_elv.get('elev'))
-    slp_val = ee.Image.constant(mang_slope.get('slope'))
-
-    return dsm.select('elev').lte(el_val).And(dsm.select('slope').lte(slp_val)).double()
 
 # roi here should the dict equivalent of a geojson polygon
 def coastline(poly: dict) -> ee.Geometry:
@@ -126,18 +99,6 @@ def visualize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
         "created_at": int(time.time()),
         "timeout": tile_timeout
     }
-
-def final_mask(buff_dist: int, poly: dict, clot: ee.Image, hlot: ee.Image) -> ee.Image:
-    coast = coastline(poly)
-    poly = coast.buffer(buff_dist)
-    mangs = known_mangroves().clip(poly)
-    tmask = topo_mask(topo_dsm(), mangs)
-
-    mndwi_cont = add_mndwi(clot).lt(0.09)
-    mndwi_hist = add_mndwi(hlot).lt(0.09)
-    h2o_mask = mndwi_cont.add(mndwi_hist).gt(1)
-
-    return h2o_mask.multiply(tmask).eq(1)
 
 def chot_imagery(roi: dict, buff_dist: int) -> ee.ImageCollection:
     chot, _ = cont_imagery(roi, buff_dist)

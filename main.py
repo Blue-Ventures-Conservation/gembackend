@@ -12,6 +12,7 @@ import project
 from access import *
 from roi import *
 from assets import *
+from classification import *
 from separability import *
 
 app = Flask(__name__)
@@ -132,6 +133,17 @@ def corr_route(uid: str):
         data = correlation_matrix(content["time_period"], uid, content["storage_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
         return "", error_check("/correlation_chart", content, e)
+    
+    return jsonify(data)
+
+@app.route("/classification", methods=["POST"])
+@token_check
+def classification_route(uid: str):
+    try:
+        content = request.json
+        data = combined_classification(uid, content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["palette"], content["roi"], content["roi"]["buff_dist"])
+    except Exception as e:
+        return "", error_check("/classification", content, e)
     
     return jsonify(data)
 

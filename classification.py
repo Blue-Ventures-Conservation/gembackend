@@ -4,7 +4,7 @@ import time
 from typing import List
 
 from project import tile_timeout
-from roi import coastline, final_mask, cont_imagery, hist_imagery
+from roi import coastline, cont_imagery, hist_imagery, known_mangroves
 from assets import asset_error, training_poly
 
 trees = 1000
@@ -14,7 +14,7 @@ bag = 0.75
 nodes = None
 seeds = 0
 
-def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int):
+def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, palette: List[str], roi: dict, buff_dist: int):
     try:
         coast = coastline(roi["polygon"])
         poly = coast.buffer(buff_dist)
@@ -27,13 +27,13 @@ def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spe
         hlot = hlot.updateMask(fmask)
         cont_combo = chot.addBands(clot)
         hist_combo = hhot.addBands(hlot)
-
+        
         if use_cont_spec:
             hist_combo = cont_combo
-
-        cont_classification = classify(cont_combo, training_poly(uid, cont_key, num_label), poly, char_label, palette)
-        hist_classification = classify(hist_combo, training_poly(uid, hist_key, num_label), poly, char_label, palette)
-
+        
+        cont_classification = classify(cont_combo, training_poly(uid, cont_key, num_label), poly, num_label, palette)
+        hist_classification = classify(hist_combo, training_poly(uid, hist_key, num_label), poly, num_label, palette)
+        
         return {
             "contemporary_classification": cont_classification,
             "historical_classification": hist_classification,
@@ -43,11 +43,11 @@ def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spe
     except Exception as e:
         raise asset_error(e)
 
-def classify(combo: ee.Image, t_poly: ee.FeatureCollection, poly: ee.Geometry, char_label: str, palette: List[str]) -> dict:
+def classify(combo: ee.Image, t_poly: ee.FeatureCollection, poly: ee.Geometry, num_label: str, palette: List[str]) -> dict:
     bands = combo.bandNames()
     sample = combo.sampleRegions(
         collection = t_poly,
-        properties = [char_label],
+        properties = [num_label],
         scale = 30,
         tileScale = 16
     )
@@ -56,7 +56,7 @@ def classify(combo: ee.Image, t_poly: ee.FeatureCollection, poly: ee.Geometry, c
     training = sample.filter(ee.Filter.lt("random", 0.7))
     validation = sample.filter(ee.Filter.lt("random", 0.7))
     classifier = ee.Classifier.smileRandomForest(
-        numberOfTree = trees,
+        numberOfTrees = trees,
         variablesPerSplit = splits,
         minLeafPopulation = leafpop,
         bagFraction = bag,
@@ -64,7 +64,7 @@ def classify(combo: ee.Image, t_poly: ee.FeatureCollection, poly: ee.Geometry, c
         seed = seeds,
     ).train(
         features = training,
-        classProperty = label,
+        classProperty = num_label,
         inputProperties = bands,
     )
     
@@ -72,22 +72,64 @@ def classify(combo: ee.Image, t_poly: ee.FeatureCollection, poly: ee.Geometry, c
     
     min_no = t_poly.reduceColumns(
         reducer = ee.Reducer.min(),
-        selectors = [char_label]
+        selectors = [num_label]
     ).get("min")
-    maxno = t_poly.reduceColumns(
+    max_no = t_poly.reduceColumns(
         reducer = ee.Reducer.max(),
-        selectors = [char_label]
+        selectors = [num_label]
     ).get("max")
     
     train_accuracy = classifier.confusionMatrix()
     validated = validation.classify(classifier)
-    test_accuracy = validated.errorMatrix(char_label, "classification")
+    test_accuracy = validated.errorMatrix(num_label, "classification")
     
     vis = {"min": min_no.getInfo(), "max": max_no.getInfo(), "palette": palette}
     classification_url = classified.getMapId(vis)["tile_fetcher"].url_format
     
     return {
         "url": classification_url,
-        "resubstitution_accuracy": train_accuracy.accuracy(),
-        "validation_accuracy": test_accuracy.accuracy(),
+        "resubstitution_accuracy": float(train_accuracy.accuracy().getInfo()),
+        "validation_accuracy": float(test_accuracy.accuracy().getInfo()),
     }
+
+def final_mask(buff_dist: int, poly: dict, clot: ee.Image, hlot: ee.Image) -> ee.Image:
+    coast = coastline(poly)
+    poly = coast.buffer(buff_dist)
+    mangs = known_mangroves().clip(poly)
+    tmask = topo_mask(topo_dsm(), mangs)
+    
+    mndwi_cont = renamed_mndwi(clot).lt(0.09)
+    mndwi_hist = renamed_mndwi(hlot).lt(0.09)
+    h2o_mask = mndwi_cont.add(mndwi_hist).gt(1)
+    
+    return h2o_mask.multiply(tmask).eq(1)
+
+def topo_dsm() -> ee.Image:
+    dsm = ee.Image("JAXA/ALOS/AW3D30/V2_2").select("AVE_DSM").rename("elev")
+    slp_img = ee.Terrain.slope(ee.Image(dsm).select("elev")).double().rename("slope")
+    return dsm.addBands(slp_img)
+
+def topo_mask(dsm: ee.Image, mangs: ee.Image) -> ee.Image:
+    mang_elv = dsm.select('elev').updateMask(mangs).reduceRegion(
+            reducer = ee.Reducer.percentile(percentiles = [99]),
+            geometry = mangs.geometry(),
+            scale = 30,
+            maxPixels = 1e12,
+            bestEffort = True
+    )
+    
+    mang_slope = dsm.select('slope').updateMask(mangs).reduceRegion(
+            reducer = ee.Reducer.percentile(percentiles = [99]),
+            geometry = mangs.geometry(),
+            scale = 30,
+            maxPixels = 1e12,
+            bestEffort = True
+    )
+    
+    el_val = ee.Image.constant(mang_elv.get('elev'))
+    slp_val = ee.Image.constant(mang_slope.get('slope'))
+    
+    return dsm.select('elev').lte(el_val).And(dsm.select('slope').lte(slp_val)).double()
+
+def renamed_mndwi(img: ee.Image) -> ee.Image:
+    return img.expression('(B2 - B5)/(B2 + B5)', {'B2': img.select('Green'), 'B5': img.select('Shortwave IR 1')}).rename(['MNDWI'])

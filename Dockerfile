@@ -13,6 +13,7 @@ COPY access.py ./
 COPY project.py ./
 COPY roi.py ./
 COPY assets.py ./
+COPY classification.py ./
 COPY separability.py ./
 COPY requirements.txt ./
 
