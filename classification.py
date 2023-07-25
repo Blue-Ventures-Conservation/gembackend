@@ -14,7 +14,7 @@ bag = 0.75
 nodes = None
 seeds = 0
 
-def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, palette: List[str], roi: dict, buff_dist: int):
+def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int):
     try:
         coast = coastline(roi["polygon"])
         poly = coast.buffer(buff_dist)
@@ -31,26 +31,26 @@ def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spe
         if use_cont_spec:
             hist_combo = cont_combo
         
-        cont_classification = classify(cont_combo, training_poly(uid, cont_key, num_label), poly, num_label, palette)
-        hist_classification = classify(hist_combo, training_poly(uid, hist_key, num_label), poly, num_label, palette)
+        cont_classification, cont_classes = classify(cont_combo, training_poly(uid, cont_key, num_label), poly, num_label, char_label, palette)
+        hist_classification, hist_classes = classify(hist_combo, training_poly(uid, hist_key, num_label), poly, num_label, char_label, palette)
+
+        if cont_classes != hist_classes:
+            raise Exception("classes did not match between historical and contemporary CRAs during classification")
         
         return {
             "contemporary_classification": cont_classification,
             "historical_classification": hist_classification,
+            "classes": cont_classes,
             "created_at": int(time.time()),
             "timeout": tile_timeout
         }
     except Exception as e:
         raise asset_error(e)
 
-def classify(combo: ee.Image, t_poly: ee.FeatureCollection, poly: ee.Geometry, num_label: str, palette: List[str]) -> dict:
+def classify(combo: ee.Image, t_poly: ee.FeatureCollection, poly: ee.Geometry, num_label: str, char_label: str, palette: List[str]) -> dict:
     bands = combo.bandNames()
-    sample = combo.sampleRegions(
-        collection = t_poly,
-        properties = [num_label],
-        scale = 30,
-        tileScale = 16
-    )
+    classes = ordered_classes(zipped_props(t_poly, num_label, char_label))
+    sample = sample_image(combo, t_poly, num_label, char_label)
     
     sample = sample.randomColumn(seed = 1)
     training = sample.filter(ee.Filter.lt("random", 0.7))
@@ -90,7 +90,7 @@ def classify(combo: ee.Image, t_poly: ee.FeatureCollection, poly: ee.Geometry, n
         "url": classification_url,
         "resubstitution_accuracy": float(train_accuracy.accuracy().getInfo()),
         "validation_accuracy": float(test_accuracy.accuracy().getInfo()),
-    }
+    }, classes
 
 def final_mask(buff_dist: int, poly: dict, clot: ee.Image, hlot: ee.Image) -> ee.Image:
     coast = coastline(poly)
@@ -133,3 +133,24 @@ def topo_mask(dsm: ee.Image, mangs: ee.Image) -> ee.Image:
 
 def renamed_mndwi(img: ee.Image) -> ee.Image:
     return img.expression('(B2 - B5)/(B2 + B5)', {'B2': img.select('Green'), 'B5': img.select('Shortwave IR 1')}).rename(['MNDWI'])
+
+def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, char_label: str) -> ee.FeatureCollection:
+    return img.sampleRegions(
+        collection = t_poly,
+        properties = [num_label, char_label],
+        scale = 30,
+        tileScale = 16
+    )
+
+def zipped_props(sample: ee.FeatureCollection, num_label: str, char_label: str) -> List[str]:
+    nums = sample.distinct(num_label).aggregate_array(num_label)
+    chars = sample.distinct(char_label).aggregate_array(char_label)
+    return nums.zip(chars).sort(nums)
+
+def ordered_classes(zipped: ee.List) -> List[str]:
+    zipped = zipped.getInfo()
+    ordered = []
+    for z in zipped:
+        ordered.append(z[1])
+    
+    return ordered

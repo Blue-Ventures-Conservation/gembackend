@@ -3,6 +3,7 @@ from typing import Dict, List, Tuple
 
 from enum import Enum
 from roi import chot_imagery, clot_imagery, hhot_imagery, hlot_imagery
+from classification import sample_image, zipped_props, ordered_classes
 from assets import asset_error, training_poly
 
 class InvalidTimePeriod(Exception):
@@ -15,14 +16,6 @@ def iToTP(i: int) -> TimePeriod:
         return TimePeriod(i)
     except Exception:
         raise InvalidTimePeriod()
-
-def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, char_label: str) -> ee.FeatureCollection:
-    return img.sampleRegions(
-        collection = t_poly,
-        properties = [num_label, char_label],
-        scale = 30,
-        tileScale = 16
-    )
 
 def scatter_chart(tpi: int, uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, List[Dict[str, float]]]:
     try:
@@ -38,7 +31,6 @@ def scatter_chart(tpi: int, uid: str, key: str, num_label: str, char_label: str,
     except Exception as e:
         raise asset_error(e)
 
-
 # Returns dict of class name to list of dicts of band name to value. Values are reflectance for landsat, or index values.
 # Also contains an ordered list of classes at the root under 'classes'
 def scatter_chart_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> Dict[str, List[Dict[str, float]]]:
@@ -49,7 +41,7 @@ def scatter_chart_data(uid: str, key: str, num_label: str, char_label: str, img:
         propertySelectors = lbands,
         retainGeometry = False,
     ).toList(9999).getInfo()
-    ordered = ordered_classes(sample, num_label, char_label)
+    ordered = ordered_classes(zipped_props(sample, num_label, char_label))
     
     # this can be a large payload, so we remove unneeded values and round the floats
     # to reduce the amount of data we need to send
@@ -86,10 +78,8 @@ def box_charts(tpi: int, uid: str, key: str, num_label: str, char_label: str, ro
 def box_charts_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> Dict[str, Dict[str, List[float]]]:
     bands = img.bandNames().remove('B6')
     sample = sample_image(img, training_poly(uid, key, num_label), num_label, char_label)
-    nums = sample.distinct(num_label).aggregate_array(num_label)
-    chars = sample.distinct(char_label).aggregate_array(char_label)
-    zipped = nums.zip(chars).sort(nums)
-    ordered = ordered_zipped(zipped)
+    zipped = zipped_props(sample, num_label, char_label)
+    ordered = ordered_classes(zipped)
     
     local_bands = bands.getInfo()
     d = ee.Dictionary()
@@ -181,19 +171,6 @@ def box_chart_data(filtered: ee.FeatureCollection, bands: ee.List) -> ee.Diction
         return ee.Dictionary(prev).set(band, ee.List([mini, s1, mean, s2, maxi]))
     
     return bands.iterate(byBand, ee.Dictionary())
-
-def ordered_classes(sample: ee.FeatureCollection, num_label: str, char_label: str) -> List[str]:
-    nums = sample.distinct(num_label).aggregate_array(num_label)
-    chars = sample.distinct(char_label).aggregate_array(char_label)
-    return ordered_zipped(nums.zip(chars).sort(nums))
- 
-def ordered_zipped(zipped: ee.List) -> List[str]:
-    zipped = zipped.getInfo()
-    ordered = []
-    for z in zipped:
-        ordered.append(z[1])
-    
-    return ordered
 
 def correlation_matrix(tpi: int, uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, List[float]]:
     try:

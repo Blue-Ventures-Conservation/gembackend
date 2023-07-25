@@ -141,7 +141,7 @@ def corr_route(uid: str):
 def classification_route(uid: str):
     try:
         content = request.json
-        data = combined_classification(uid, content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["palette"], content["roi"], content["roi"]["buff_dist"])
+        data = combined_classification(uid, content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["palette"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
         return "", error_check("/classification", content, e)
     
