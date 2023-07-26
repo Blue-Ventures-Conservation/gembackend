@@ -1,0 +1,19 @@
+{
+  "contemporary_classification": {
+    "url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/62d802d9017742e098f211183ebe8641-6606a90277726034341567e7d274b97f/tiles/{z}/{x}/{y}", 
+    "resubstitution_accuracy": 1.0, 
+    "validation_accuracy": 1.0
+  }, 
+  "historical_classification": {
+    "url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/0c587dd231316a36f855f781c7c83842-1525ffc4431b81dfb0e84f8687b87ef7/tiles/{z}/{x}/{y}", 
+    "resubstitution_accuracy": 1.0, 
+    "validation_accuracy": 1.0
+  }, 
+  "classes": [
+    "Mangrove", 
+    "Not Mangrove", 
+    "Residual Water"
+  ], 
+  "created_at": 1690331699, 
+  "timeout": 57600
+}
