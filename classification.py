@@ -5,7 +5,7 @@ from typing import List
 
 from project import tile_timeout
 from roi import coastline, cont_imagery, hist_imagery, known_mangroves
-from assets import asset_error, training_poly
+from assets import MissingAsset, asset_error, training_poly
 
 trees = 1000
 splits = 1
@@ -13,6 +13,18 @@ leafpop = 1
 bag = 0.75
 nodes = None
 seeds = 0
+
+class ClassifierFailed(Exception):
+    pass
+
+def classification_error(e: Exception) -> Exception:
+    e = asset_error(e)
+    if type(e) is MissingAsset:
+        return e
+    elif "Classifier training failed" in str(e):
+        return ClassifierFailed()
+    else:
+        return e
 
 def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int):
     try:
