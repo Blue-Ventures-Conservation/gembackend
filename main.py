@@ -14,6 +14,7 @@ from roi import *
 from assets import *
 from classification import *
 from separability import *
+from dynamics import *
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -144,6 +145,17 @@ def classification_route(uid: str):
         data = combined_classification(uid, content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["palette"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
         return "", error_check("/classification", content, e)
+    
+    return jsonify(data)
+
+@app.route("/dynamics", methods=["POST"])
+@token_check
+def dynamics_route(uid: str):
+    try:
+        content = request.json
+        data = get_dynamics(uid, content["target_class"], content["sub_regions"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
+    except Exception as e:
+        return "", error_check("/dynamics", content, e)
     
     return jsonify(data)
 

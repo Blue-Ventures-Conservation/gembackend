@@ -26,7 +26,7 @@ class NoHistoricalImages(Exception):
 def known_mangroves() -> ee.Image:
     return ee.ImageCollection("LANDSAT/MANGROVE_FORESTS").reduce(ee.Reducer.mean())
 
-# roi here should the dict equivalent of a geojson polygon
+# poly here should be the dict equivalent of a geojson polygon
 def coastline(poly: dict) -> ee.Geometry:
     # use the roi to clip the world boundary polygons
     area = ee.FeatureCollection('USDOS/LSIB/2013').filterBounds(ee.Geometry(poly)).geometry()
@@ -204,7 +204,7 @@ def filtered_ls(dataset: str, poly: ee.Geometry, year1: int, year2: int, month1:
     return ee.ImageCollection(dataset).filterBounds(poly) \
         .filterMetadata("CLOUD_COVER", "not_greater_than", cloud_cover_limit) \
         .filterDate(f'{year1}-01-01', f'{year2}-12-31') \
-        .filter(ee.Filter.calendarRange(month1, month2, "month"))
+        .filter(ee.Filter.calendarRange(month1, month2, "month")) # handles wrapping if month1 < month2
     
 def etm_to_oli(img: ee.Image) -> ee.Image:
     itcps = ee.Image.constant([0.0003, 0.0088, 0.0061, 0.0412, 0.0254, 0.0172]).multiply(10000)

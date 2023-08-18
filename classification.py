@@ -1,7 +1,7 @@
 import ee
 import time
 
-from typing import List
+from typing import List, Tuple, Dict, Any
 
 from project import tile_timeout
 from roi import coastline, cont_imagery, hist_imagery, known_mangroves
@@ -28,23 +28,9 @@ def classification_error(e: Exception) -> Exception:
 
 def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int):
     try:
-        coast = coastline(roi["polygon"])
-        poly = coast.buffer(buff_dist)
-        chot, clot = cont_imagery(roi, buff_dist)
-        hhot, hlot = hist_imagery(roi, buff_dist)
-        fmask = final_mask(buff_dist, roi["polygon"], clot, hlot)
-        chot = chot.updateMask(fmask)
-        clot = clot.updateMask(fmask)
-        hhot = hhot.updateMask(fmask)
-        hlot = hlot.updateMask(fmask)
-        cont_combo = chot.addBands(clot)
-        hist_combo = hhot.addBands(hlot)
-        
-        if use_cont_spec:
-            hist_combo = cont_combo
-        
-        cont_classification, cont_classes = classify(cont_combo, training_poly(uid, cont_key, num_label), poly, num_label, char_label, palette)
-        hist_classification, hist_classes = classify(hist_combo, training_poly(uid, hist_key, num_label), poly, num_label, char_label, palette)
+        cont_combo, hist_combo, cont_t_poly, hist_t_poly, coast = combined_classification_prep(uid, cont_key, hist_key, use_cont_spec, roi, buff_dist)
+        cont_classification, cont_classes = classify_fully(cont_combo, cont_t_poly, coast, num_label, char_label, palette)
+        hist_classification, hist_classes = classify_fully(hist_combo, hist_t_poly, coast, num_label, char_label, palette)
 
         if cont_classes != hist_classes:
             raise Exception("classes did not match between historical and contemporary CRAs during classification")
@@ -59,9 +45,44 @@ def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spe
     except Exception as e:
         raise asset_error(e)
 
-def classify(combo: ee.Image, t_poly: ee.FeatureCollection, poly: ee.Geometry, num_label: str, char_label: str, palette: List[str]) -> dict:
+def combined_classification_lazy(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.Geometry, Dict[str, int]]:
+    cont_combo, hist_combo, cont_t_poly, hist_t_poly, coast = combined_classification_prep(uid, cont_key, hist_key, use_cont_spec, roi, buff_dist)
+    cont_cmap, cont_classification = classify(cont_combo, cont_t_poly, coast, num_label, char_label)
+    hist_cmap, hist_classification = classify(hist_combo, hist_t_poly, coast, num_label, char_label)
+    if cont_cmap != hist_cmap:
+        raise Exception("class maps did not match between historical and contemporary CRAs during classification")
+    
+    return cont_classification, hist_classification, coast, cont_cmap
+
+def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry]:
+    coast = coastline(roi["polygon"])
+    coast = coast.buffer(buff_dist)
+    chot, clot = cont_imagery(roi, buff_dist)
+    hhot, hlot = hist_imagery(roi, buff_dist)
+    fmask = final_mask(coast, clot, hlot)
+    chot = chot.updateMask(fmask)
+    clot = clot.updateMask(fmask)
+    hhot = hhot.updateMask(fmask)
+    hlot = hlot.updateMask(fmask)
+    cont_combo = chot.addBands(clot)
+    hist_combo = hhot.addBands(hlot)
+    
+    if use_cont_spec:
+        hist_combo = cont_combo
+
+    ct_poly = training_poly(uid, cont_key, num_label)
+    ht_poly = training_poly(uid, hist_key, num_label)
+    return cont_combo, hist_combo, ct_poly, ht_poly, coast
+
+def classify(combo: ee.Image, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str) -> Tuple[Dict[str, int], ee.Image]:
+    _, cmap, classified, _, _, _ = classify_lazy(combo, t_poly, coast, num_label, char_label)
+    return cmap, classified
+
+def classify_lazy(combo: ee.Image, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str) -> Tuple[List[str], Dict[str, int], ee.Image, Any, ee.FeatureCollection, ee.FeatureCollection]:
     bands = combo.bandNames()
-    classes = ordered_classes(zipped_props(t_poly, num_label, char_label))
+    zipped = zipped_props(t_poly, num_label, char_label).getInfo()
+    cmap = class_map(zipped)
+    classes = ordered_classes(zipped)
     sample = sample_image(combo, t_poly, num_label, char_label)
     
     sample = sample.randomColumn(seed = 1)
@@ -80,8 +101,12 @@ def classify(combo: ee.Image, t_poly: ee.FeatureCollection, poly: ee.Geometry, n
         inputProperties = bands,
     )
     
-    classified = combo.classify(classifier).clip(poly)
-    
+    classified = combo.classify(classifier).clip(coast)
+    return classes, cmap, classified, classifier, training, validation
+
+def classify_fully(combo: ee.Image, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: List[str]) -> Tuple[dict, List[str]]:
+    classes, _, classified, classifier, training, validation = classify_lazy(combo, t_poly, coast, num_label, char_label)
+
     min_no = t_poly.reduceColumns(
         reducer = ee.Reducer.min(),
         selectors = [num_label]
@@ -98,16 +123,14 @@ def classify(combo: ee.Image, t_poly: ee.FeatureCollection, poly: ee.Geometry, n
     vis = {"min": min_no.getInfo(), "max": max_no.getInfo(), "palette": palette}
     classification_url = classified.getMapId(vis)["tile_fetcher"].url_format
     
-    return {
+    return classified, {
         "url": classification_url,
         "resubstitution_accuracy": float(train_accuracy.accuracy().getInfo()),
         "validation_accuracy": float(test_accuracy.accuracy().getInfo()),
     }, classes
 
-def final_mask(buff_dist: int, poly: dict, clot: ee.Image, hlot: ee.Image) -> ee.Image:
-    coast = coastline(poly)
-    poly = coast.buffer(buff_dist)
-    mangs = known_mangroves().clip(poly)
+def final_mask(coast: ee.Geometry, clot: ee.Image, hlot: ee.Image) -> ee.Image:
+    mangs = known_mangroves().clip(coast)
     tmask = topo_mask(topo_dsm(), mangs)
     
     mndwi_cont = renamed_mndwi(clot).lt(0.09)
@@ -159,8 +182,14 @@ def zipped_props(sample: ee.FeatureCollection, num_label: str, char_label: str) 
     chars = sample.distinct(char_label).aggregate_array(char_label)
     return nums.zip(chars).sort(nums)
 
-def ordered_classes(zipped: ee.List) -> List[str]:
-    zipped = zipped.getInfo()
+def class_map(zipped: list) -> Dict[str, int]:
+    cm = {}
+    for z in zipped:
+        cm[z[1]] = int(z[0])
+    
+    return cm
+
+def ordered_classes(zipped: list) -> List[str]:
     ordered = []
     for z in zipped:
         ordered.append(z[1])

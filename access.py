@@ -7,9 +7,9 @@ storage_bucket = "{project_id}.appspot.com"
 allowed_prefix = "access/allowed/"
 blocked_prefix = "access/blocked/"
 
-# firebase_admin is assumed to already by initialized
+# firebase_admin is assumed to already be initialized
 class Accessor:
-    def __init__(self, timeout=60):
+    def __init__(self, timeout=600):
         self._timeout = timeout
         self._allowed = set()
         self._blocked = set()
