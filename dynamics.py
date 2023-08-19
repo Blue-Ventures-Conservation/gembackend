@@ -6,11 +6,7 @@ from project import tile_timeout
 from classification import combined_classification_lazy
 from assets import asset_error
 
-red = "DD4425"
-green = "25DDAA"
-blue = "25AADD"
-
-def get_dynamics(uid: str, target_class: str, sub_regions: List[dict], cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
+def get_dynamics(uid: str, target_class: str, sub_regions: List[dict], red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
     try:
         cont_class, hist_class, coast, class_map = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
          

@@ -15,6 +15,7 @@ COPY roi.py ./
 COPY assets.py ./
 COPY classification.py ./
 COPY separability.py ./
+COPY dynamics.py ./
 COPY requirements.txt ./
 
 # Install production dependencies.
