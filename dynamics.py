@@ -44,7 +44,7 @@ def get_dynamics(uid: str, target_class: str, sub_regions: List[dict], red: str,
         for sr in sub_regions:
             name = sr["name"]
             lpg = lpg_do(ctarget, htarget, lmask, pmask, gmask, ee.Geometry(sr["geometry"]))
-            output["sub_region_stats"].append({"contemporary_area": lpg["contemporary_area"], "historical_area": lpg["historical_area"], "loss": lpg["loss"], "persistence": lpg["persistence"], "gain": lpg["gain"]})
+            output["sub_region_stats"].append({"name": name, "contemporary_area": lpg["contemporary_area"], "historical_area": lpg["historical_area"], "loss": lpg["loss"], "persistence": lpg["persistence"], "gain": lpg["gain"]})
         
         return output
     except Exception as e:

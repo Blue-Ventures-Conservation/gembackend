@@ -7,8 +7,17 @@
     "persistence": 262594961.75891232, 
     "gain": 21690948.84983796
   }, 
-  "loss_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/2de3242a91fb5a22be538cc4cf9400fa-0c18bce3c2eff5ec40c2a2868d19e5ee/tiles/{z}/{x}/{y}", 
-  "persistence_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/a26705567a0496637b6044b2ad19c479-b41309f72810c2a2c4f5ad13af208e14/tiles/{z}/{x}/{y}", 
-  "gain_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/72fa9460aa7537ab2c49fe3d722b2724-fa310fc3f6cfc5b4cab1b3e4704ee886/tiles/{z}/{x}/{y}", 
-  "sub_region_stats": []
+  "loss_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/2de3242a91fb5a22be538cc4cf9400fa-89e64a0de973e8fbfecddea2b1bda896/tiles/{z}/{x}/{y}", 
+  "persistence_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/a26705567a0496637b6044b2ad19c479-5f84d4b374fd4103635d39c5b3bd50d6/tiles/{z}/{x}/{y}", 
+  "gain_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/72fa9460aa7537ab2c49fe3d722b2724-e1c01a9cb29c80adea3387f86a291fa5/tiles/{z}/{x}/{y}", 
+  "sub_region_stats": [
+    {
+      "name": "East Ambanja",
+      "contemporary_area": 39384134.79329212,
+      "historical_area": 41595235.17343056,
+      "loss": 4594441.333306526,
+      "persistence": 37000793.84012403,
+      "gain": 2383340.953168084
+    }
+  ]
 }
