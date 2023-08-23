@@ -1,11 +1,22 @@
 {
+"target_class": "Mangrove",
+"sub_regions": [],
+"red": "FF0000",
+"green": "00FF00",
+"blue": "0000FF",
+"contemporary_storage_key": "TAB_CRA_2020_210224_binary",
+"historical_storage_key": "TAB_CRA_2000_210301_binary",
+"use_cont_spec": false,
+"num_label": "Classvalue",
+"char_label": "Classname",
+"roi": {
   "buff_dist":2500,
   "name":"my_roi",
   "cont_year_start":2019,
   "cont_year_end":2021,
   "cont_month_start":6,
   "cont_month_end":8,
-  "hist_year_start":1999,
+  "hist_year_start":1998,
   "hist_year_end":2001,
   "hist_month_start":6,
   "hist_month_end":8,
@@ -184,4 +195,5 @@
       ]
     ]
   }
+}
 }

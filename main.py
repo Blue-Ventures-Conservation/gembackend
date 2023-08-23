@@ -172,7 +172,8 @@ def error_check(route: str, content: dict, e: Exception) -> str:
     elif t is InvalidTimePeriod:
         return "400 invalid time period"
     else:
-        logging.error("Uncaught exception: {}:\n\n{}\n\n{}".format(route, pprint.pformat(content), e))
+        logging.error("{} error: \n{}".format(route, pprint.pformat(content)))
+        logging.exception(e)
         return "500"
 
 if __name__ == "__main__":

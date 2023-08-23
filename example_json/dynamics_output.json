@@ -1,0 +1,14 @@
+{
+  "name": "my_roi", 
+  "stats": {
+    "contemporary_area": 284285910.6087502, 
+    "historical_area": 300631334.9778578, 
+    "loss": 38036373.218945555, 
+    "persistence": 262594961.75891232, 
+    "gain": 21690948.84983796
+  }, 
+  "loss_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/2de3242a91fb5a22be538cc4cf9400fa-0c18bce3c2eff5ec40c2a2868d19e5ee/tiles/{z}/{x}/{y}", 
+  "persistence_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/a26705567a0496637b6044b2ad19c479-b41309f72810c2a2c4f5ad13af208e14/tiles/{z}/{x}/{y}", 
+  "gain_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/72fa9460aa7537ab2c49fe3d722b2724-fa310fc3f6cfc5b4cab1b3e4704ee886/tiles/{z}/{x}/{y}", 
+  "sub_region_stats": []
+}

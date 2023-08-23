@@ -1,0 +1,8 @@
+{
+  "chot_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/29eda6725676e0419b859ed455ea3f53-97d0d756972b52fcee03c242169f7619/tiles/{z}/{x}/{y}", 
+  "clot_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/28dfc212c29fce21e41c94cad1482255-4a5400905d7961d7c3915e3edac935e4/tiles/{z}/{x}/{y}", 
+  "hhot_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/90f8796b95a7ce71558dc07f337c884e-ba9792570ff8ab0d91957d14b40ca669/tiles/{z}/{x}/{y}", 
+  "hlot_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/201211eda81aa7608e36565aa4c199ce-9693c48be186e89335879e65cbaa1cac/tiles/{z}/{x}/{y}", 
+  "created_at": 1692766503, 
+  "timeout": 57600
+}

@@ -31,7 +31,7 @@ There is some sample input in the `roi_input.json` file.
 
 You can post that to the local server like so, using curl:
 ```curl
-curl -X POST -H "Content-Type: application/json" -d @roi_input.json http://localhost:8080/roi
+curl -v -H "Content-Type: application/json" -d @roi_input.json http://127.0.0.1:8080/roi
 ```
 
 ### IAM principal roles

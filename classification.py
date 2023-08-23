@@ -28,7 +28,7 @@ def classification_error(e: Exception) -> Exception:
 
 def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int):
     try:
-        cont_combo, hist_combo, cont_t_poly, hist_t_poly, coast = combined_classification_prep(uid, cont_key, hist_key, use_cont_spec, roi, buff_dist)
+        cont_combo, hist_combo, cont_t_poly, hist_t_poly, coast = combined_classification_prep(uid, cont_key, hist_key, use_cont_spec, num_label, roi, buff_dist)
         cont_classification, cont_classes = classify_fully(cont_combo, cont_t_poly, coast, num_label, char_label, palette)
         hist_classification, hist_classes = classify_fully(hist_combo, hist_t_poly, coast, num_label, char_label, palette)
 
@@ -46,7 +46,7 @@ def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spe
         raise asset_error(e)
 
 def combined_classification_lazy(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.Geometry, Dict[str, int]]:
-    cont_combo, hist_combo, cont_t_poly, hist_t_poly, coast = combined_classification_prep(uid, cont_key, hist_key, use_cont_spec, roi, buff_dist)
+    cont_combo, hist_combo, cont_t_poly, hist_t_poly, coast = combined_classification_prep(uid, cont_key, hist_key, use_cont_spec, num_label, roi, buff_dist)
     cont_cmap, cont_classification = classify(cont_combo, cont_t_poly, coast, num_label, char_label)
     hist_cmap, hist_classification = classify(hist_combo, hist_t_poly, coast, num_label, char_label)
     if cont_cmap != hist_cmap:
@@ -54,7 +54,7 @@ def combined_classification_lazy(uid: str, cont_key: str, hist_key: str, use_con
     
     return cont_classification, hist_classification, coast, cont_cmap
 
-def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry]:
+def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry]:
     coast = coastline(roi["polygon"])
     coast = coast.buffer(buff_dist)
     chot, clot = cont_imagery(roi, buff_dist)
@@ -123,7 +123,7 @@ def classify_fully(combo: ee.Image, t_poly: ee.FeatureCollection, coast: ee.Geom
     vis = {"min": min_no.getInfo(), "max": max_no.getInfo(), "palette": palette}
     classification_url = classified.getMapId(vis)["tile_fetcher"].url_format
     
-    return classified, {
+    return {
         "url": classification_url,
         "resubstitution_accuracy": float(train_accuracy.accuracy().getInfo()),
         "validation_accuracy": float(test_accuracy.accuracy().getInfo()),

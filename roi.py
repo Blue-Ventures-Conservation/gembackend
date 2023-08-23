@@ -29,7 +29,7 @@ def known_mangroves() -> ee.Image:
 # poly here should be the dict equivalent of a geojson polygon
 def coastline(poly: dict) -> ee.Geometry:
     # use the roi to clip the world boundary polygons
-    area = ee.FeatureCollection('USDOS/LSIB/2013').filterBounds(ee.Geometry(poly)).geometry()
+    area = ee.FeatureCollection('USDOS/LSIB/2017').filterBounds(ee.Geometry(poly)).geometry()
 
     def geom_coords(geo: ee.Geometry) -> ee.List:
         return ee.Geometry(geo).coordinates()
@@ -148,7 +148,8 @@ def get_imagery(buff_dist: int, indices: List[str], poly: dict, year1: int, year
     
     imgs = oli_imgs.merge(tm_imgs)
     
-    if imgs.size().getInfo() <= 0:
+    img_count = imgs.size().getInfo()
+    if img_count <= 0:
         raise NoImages()
     
     imgs = imgs.map(apply_scale_factors).map(fix_float).map(doubleOO).map(cloud_mask)
@@ -245,7 +246,7 @@ def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry, m
             .select('qa').eq(50)
     
     def mndwi_map(img: ee.Image) -> ee.Image:
-        mndwi = add_mndwi(img)
+        mndwi = produce_mndwi(img)
         # use the MODIS land/water mask and cloud mask to mask out the land
         masked_mndwi = mndwi.updateMask(land_mask)
         # reduce the image to the buffered shoreline, calculating a MNDWI
@@ -277,6 +278,10 @@ def tide_bands(imgs: ee.ImageCollection) -> ee.ImageCollection:
         return img.addBands(img.metadata("inv_MNDWI"))
     
     return imgs.map(mndwi_band).map(inv_mndwi).map(inv_mndwi_band)
+
+#
+# We don't use normalizedDifference from the API because it affects classification poorly for some reason...
+#
 
 def add_cmri(img: ee.Image) -> ee.Image:
     return img.addBands(produce_ndvi(img).subtract(produce_mndwi(img)).rename('CMRI'))
