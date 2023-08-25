@@ -10,6 +10,8 @@
   "loss_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/2de3242a91fb5a22be538cc4cf9400fa-89e64a0de973e8fbfecddea2b1bda896/tiles/{z}/{x}/{y}", 
   "persistence_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/a26705567a0496637b6044b2ad19c479-5f84d4b374fd4103635d39c5b3bd50d6/tiles/{z}/{x}/{y}", 
   "gain_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/72fa9460aa7537ab2c49fe3d722b2724-e1c01a9cb29c80adea3387f86a291fa5/tiles/{z}/{x}/{y}", 
+  "created_at": 1690331699,
+  "timeout": 57600,
   "sub_region_stats": [
     {
       "name": "East Ambanja",

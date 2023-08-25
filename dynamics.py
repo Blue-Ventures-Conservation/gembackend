@@ -1,4 +1,5 @@
 import ee
+import time
 
 from typing import List
 
@@ -38,6 +39,8 @@ def get_dynamics(uid: str, target_class: str, sub_regions: List[dict], red: str,
                 "loss_url": lpg_url(lmask, red),
                 "persistence_url": lpg_url(pmask, green),
                 "gain_url": lpg_url(gmask, blue),
+                "created_at": int(time.time()),
+                "timeout": tile_timeout,
                 "sub_region_stats": []
         }
         
