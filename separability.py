@@ -41,7 +41,7 @@ def scatter_chart_data(uid: str, key: str, num_label: str, char_label: str, img:
         propertySelectors = lbands,
         retainGeometry = False,
     ).toList(9999).getInfo()
-    ordered = ordered_classes(zipped_props(sample, num_label, char_label))
+    ordered = ordered_classes(zipped_props(sample, num_label, char_label).getInfo())
     
     # this can be a large payload, so we remove unneeded values and round the floats
     # to reduce the amount of data we need to send
@@ -79,7 +79,7 @@ def box_charts_data(uid: str, key: str, num_label: str, char_label: str, img: ee
     bands = img.bandNames().remove('B6')
     sample = sample_image(img, training_poly(uid, key, num_label), num_label, char_label)
     zipped = zipped_props(sample, num_label, char_label)
-    ordered = ordered_classes(zipped)
+    ordered = ordered_classes(zipped.getInfo())
     
     local_bands = bands.getInfo()
     d = ee.Dictionary()
