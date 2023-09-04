@@ -1,0 +1,10 @@
+{
+  "contemporary": {
+    "task": "projects/earthengine-legacy/operations/ATFZZMR6Q44GR5UOGMJP423Z", 
+    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/df681b9cd2f4419ca316d48a4e96e00f.tif"
+  }, 
+  "historical": {
+    "task": "projects/earthengine-legacy/operations/NLX32FDG4ZOFJ6RIEU5ILFPM", 
+    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/18ad7ddd875848d0acda69c62fbb865c.tif"
+  }
+}

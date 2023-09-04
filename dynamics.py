@@ -5,25 +5,28 @@ from typing import List
 
 from project import tile_timeout
 from classification import combined_classification_lazy
-from assets import asset_error
+from assets import asset_error, make_export
+
+def dynamics_export(uid: str, target_class: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
+    try:
+        _, _, lmask, pmask, gmask, coast = dynamics_masks(uid, target_class, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
+        print(lmask.bandNames().getInfo())
+        
+        ltask = make_export(uid, lmask, coast)
+        ptask = make_export(uid, pmask, coast)
+        gtask = make_export(uid, gmask, coast)
+        
+        return {
+            "loss": ltask,
+            "persistence": ptask,
+            "gain": gtask,
+        }
+    except Exception as e:
+        raise asset_error(e)
 
 def get_dynamics(uid: str, target_class: str, sub_regions: List[dict], red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
     try:
-        cont_class, hist_class, coast, class_map = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
-         
-        class_no = class_map.get(target_class)
-        if class_no == None:
-            raise Exception("Target class not found in the CRA")
-        
-        ctarget = cont_class.eq(class_no).clip(coast)
-        htarget = hist_class.eq(class_no).clip(coast)
-        ctarget.getInfo()
-        htarget.getInfo()
-        lmask = htarget.subtract(ctarget).selfMask()
-        pmask = htarget.And(ctarget).selfMask()
-        gmask = ctarget.subtract(htarget).selfMask()
-        ctarget = ctarget.selfMask()
-        htarget = htarget.selfMask()
+        ctarget, htarget, lmask, pmask, gmask, coast = dynamics_masks(uid, target_class, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
         
         roi_lpg = lpg_do(ctarget, htarget, lmask, pmask, gmask, coast)
         
@@ -52,6 +55,23 @@ def get_dynamics(uid: str, target_class: str, sub_regions: List[dict], red: str,
         return output
     except Exception as e:
         raise asset_error(e)
+
+def dynamics_masks(uid: str, target_class: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
+    cont_class, hist_class, coast, class_map = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
+    
+    class_no = class_map.get(target_class)
+    if class_no == None:
+        raise Exception("Target class not found in the CRA")
+    
+    ctarget = cont_class.eq(class_no).clip(coast)
+    htarget = hist_class.eq(class_no).clip(coast)
+    lmask = htarget.subtract(ctarget).selfMask().rename('loss')
+    pmask = htarget.And(ctarget).selfMask().rename('persistence')
+    gmask = ctarget.subtract(htarget).selfMask().rename('gain')
+    ctarget = ctarget.selfMask()
+    htarget = htarget.selfMask()
+    
+    return ctarget, htarget, lmask, pmask, gmask, coast
 
 def lpg_url(mask: ee.Image, color: str) -> str:
     vis = {"palette": color}

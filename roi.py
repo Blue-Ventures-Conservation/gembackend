@@ -2,6 +2,7 @@ import ee
 import time
 from typing import Dict, List, Tuple
 from project import tile_timeout
+from assets import make_export
 
 buffers = {
     '1 km': 1000, '2.5 km': 2500, '5 km': 5000, '7.5 km': 7500, '10 km': 10000, '12.5 km': 12500,
@@ -22,6 +23,32 @@ class NoContemporaryImages(Exception):
 
 class NoHistoricalImages(Exception):
     pass
+
+def ls_imagery_export(uid: str, roi: dict, buff_dist: int):
+    try:
+        hhot, hlot = hist_imagery(roi, buff_dist)
+    except NoImages:
+        raise NoHistoricalImages()
+    
+    try:
+        chot, clot = cont_imagery(roi, buff_dist)
+    except NoImages:
+        raise NoContemporaryImages()
+    
+    coast = coastline(roi["polygon"])
+    coast = coast.buffer(buff_dist)
+    
+    hhot_task = make_export(uid, hhot, coast)
+    hlot_task = make_export(uid, hlot, coast)
+    chot_task = make_export(uid, chot, coast)
+    clot_task = make_export(uid, clot, coast)
+    
+    return {
+        "chot": chot_task,
+        "clot": clot_task,
+        "hhot": hhot_task,
+        "hlot": hlot_task,
+    }
 
 def known_mangroves() -> ee.Image:
     return ee.ImageCollection("LANDSAT/MANGROVE_FORESTS").reduce(ee.Reducer.mean())
@@ -155,8 +182,8 @@ def get_imagery(buff_dist: int, indices: List[str], poly: dict, year1: int, year
     imgs = imgs.map(apply_scale_factors).map(fix_float).map(doubleOO).map(cloud_mask)
     imgs = tide_bands(shore_refl(imgs, zone, poly, min_avg))
     
-    high_tide = ee.ImageCollection(imgs).qualityMosaic("MNDWI").select(['B1','B2','B3','B4','B5','B6','B7'])
-    low_tide = ee.ImageCollection(imgs).qualityMosaic("inv_MNDWI").select(['B1','B2','B3','B4','B5','B6','B7'])
+    high_tide = ee.ImageCollection(imgs).qualityMosaic("MNDWI").select(['B1','B2','B3','B4','B5','B6','B7']).clip(poly)
+    low_tide = ee.ImageCollection(imgs).qualityMosaic("inv_MNDWI").select(['B1','B2','B3','B4','B5','B6','B7']).clip(poly)
 
     known_indices = []
 

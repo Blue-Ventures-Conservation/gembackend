@@ -1,4 +1,4 @@
-import ee, logging
+import ee, logging, uuid
 
 from typing import Tuple
 from time import sleep
@@ -7,10 +7,31 @@ import project
 asset_users_path = 'projects/{project_id}/assets/users/'
 asset_uid_path = asset_users_path+'{uid}'
 asset_users_table_path = asset_users_path+'{uid}/{key}'
-asset_user_shps = 'gs://{project_id}.appspot.com/users/{uid}/shps/{key}.zip'
+asset_default_bucket = '{project_id}.appspot.com'
+asset_user_shps = 'gs://{bucket}/users/{uid}/shps/{key}.zip'
+asset_user_downloads = 'users/{uid}/downloads/{slug}'
 
 class MissingAsset(Exception):
     pass
+
+def make_export(uid: str, img: ee.Image, region: ee.Geometry) -> str:
+    slug = uuid.uuid4().hex
+    fprefix = asset_user_downloads.format(uid = uid, slug = slug)
+    bucket = asset_default_bucket.format(project_id = project.project_id)
+    task = ee.batch.Export.image.toCloudStorage(
+        fileNamePrefix = fprefix,
+        bucket = bucket,
+        image = img,
+        region = region,
+        scale = 30,
+        maxPixels = 1e13,
+    )
+    task.start()
+    
+    return {
+        'task': task.status()['name'],
+        'path': bucket + '/' + fprefix + ".tif"
+    }
 
 def asset_error(e: Exception) -> Exception:
     estr = str(e)
@@ -46,7 +67,7 @@ def upload_table_asset(uid: str, key: str) -> Tuple[str, bool]:
         return "", True
 
     try:
-        shp = asset_user_shps.format(project_id=project.project_id, uid = uid, key = key)
+        shp = asset_user_shps.format(bucket = asset_default_bucket.format(project_id=project.project_id), uid = uid, key = key)
         result = ee.data.startTableIngestion(request_id = ee.data.newTaskId()[0], params = {'name': name, 'sources': [{'uris': [shp], 'charset': 'UTF-8'}]})
         return result['name'], True
     except:

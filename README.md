@@ -81,3 +81,11 @@ The only changes from the default settings for this service are lengthening the 
 as the service account for the service under the security tab when editing and deploying.
 
 Cloud Run creates a service URL for the service. This URL is probably safe to deploy with for now.
+
+### Cloud Storage
+
+We use Google Cloud Storage to manage files on behalf of users, things like CRAs.
+
+We also use GCS to handle downloads of images from GEE, as a temporary storage location from which the imagery
+can be downloaded to users' local devices. These files are subject to a lifecycle rule, that has been set
+on the default bucket in the gcloud console enforcing a lifetime of 1 day for these files, afterwhich they are deleted.

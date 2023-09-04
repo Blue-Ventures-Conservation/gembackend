@@ -5,7 +5,7 @@ from typing import List, Tuple, Dict, Any
 
 from project import tile_timeout
 from roi import coastline, cont_imagery, hist_imagery, known_mangroves
-from assets import MissingAsset, asset_error, training_poly
+from assets import MissingAsset, make_export, asset_error, training_poly
 
 trees = 1000
 splits = 1
@@ -25,6 +25,20 @@ def classification_error(e: Exception) -> Exception:
         return ClassifierFailed()
     else:
         return e
+
+def classification_export(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
+    try:
+        cont_class, hist_class, coast, _ = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
+        
+        cont_task = make_export(uid, cont_class, coast)
+        hist_task = make_export(uid, hist_class, coast)
+
+        return {
+            "contemporary": cont_task,
+            "historical": hist_task,
+        }
+    except Exception as e:
+        raise asset_error(e)
 
 def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int):
     try:

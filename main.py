@@ -104,6 +104,17 @@ def ls_imagery_route():
     
     return jsonify(visuals)
 
+@app.route("/export_ls_imagery", methods=["POST"])
+@token_check
+def export_ls_imagery(uid: str):
+    try:
+        content = request.json
+        data = ls_imagery_export(uid, content, content["buff_dist"])
+    except Exception as e:
+        return "", error_check("/export_roi_imagery", content, e)
+    
+    return jsonify(data)
+
 @app.route("/box_chart", methods=["POST"])
 @token_check
 def box_route(uid: str):
@@ -148,6 +159,17 @@ def classification_route(uid: str):
     
     return jsonify(data)
 
+@app.route("/export_classification", methods=["POST"])
+@token_check
+def export_classification(uid: str):
+    try:
+        content = request.json
+        data = classification_export(uid, content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
+    except Exception as e:
+        return "", error_check("/export_classification", content, e)
+    
+    return jsonify(data)
+
 @app.route("/dynamics", methods=["POST"])
 @token_check
 def dynamics_route(uid: str):
@@ -158,6 +180,40 @@ def dynamics_route(uid: str):
         return "", error_check("/dynamics", content, e)
     
     return jsonify(data)
+
+@app.route("/export_dynamics", methods=["POST"])
+@token_check
+def export_dynamics(uid: str):
+    try:
+        content = request.json
+        data = dynamics_export(uid, content["target_class"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
+    except Exception as e:
+        return "", error_check("/export_dynamics", content, e)
+    
+    return jsonify(data)
+
+@app.route("/task_status", methods=["POST"])
+@token_check
+def task_status(uid: str):
+    try:
+        content = request.json
+        ok, err = check_operation(content["task"])
+        
+        res = {
+            "status": False,
+            "err": None,
+        }
+        
+        if err is not None:
+            res = {"status": False, "err": err}
+        
+        if ok:
+            res = {"status": True}
+        
+    except Exception as e:
+        return "", error_check("/task_status", content, e)
+    
+    return jsonify(res)
 
 def error_check(route: str, content: dict, e: Exception) -> str:
     t = type(e)
