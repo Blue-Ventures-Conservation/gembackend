@@ -1,14 +1,14 @@
 {
   "loss": {
-    "task": "projects/earthengine-legacy/operations/MXUDPV72U57UHKEB2BLNH4VW", 
-    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/e0e8c482e6b941e48206396720247189.tif"
+    "task": "projects/earthengine-legacy/operations/UVEG3DXF2KBDANFJLMSEEAV4", 
+    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/loss_050ce3b5d9964252af88bacefbf18ea5.tif"
   }, 
   "persistence": {
-    "task": "projects/earthengine-legacy/operations/TMC6DPT7IN2RY3GTQ36D4E74", 
-    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/edad0074dd404a5884021dedaf6bc314.tif"
+    "task": "projects/earthengine-legacy/operations/WUGMTTUPFASI22OMHC6YMZDI", 
+    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/persistence_3af18f42bff34f29afac4058e02880ae.tif"
   }, 
   "gain": {
-    "task": "projects/earthengine-legacy/operations/WNQUYPETFSKVHTPIDNL7LRQH", 
-    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/3d6765178426419884bd4e3e32b5ef04.tif"
+    "task": "projects/earthengine-legacy/operations/UJV4YBI52EJ2DTGTLOE4PIFI", 
+    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/gain_a7c14763b35a4f28882a380e61117bb7.tif"
   }
 }

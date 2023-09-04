@@ -1,5 +1,9 @@
 {
+"visualize": true,
 "target_class": "Mangrove",
+"red": "FF0000",
+"green": "00FF00",
+"blue": "0000FF",
 "contemporary_storage_key": "TAB_CRA_2020_210224_binary",
 "historical_storage_key": "TAB_CRA_2000_210301_binary",
 "use_cont_spec": false,

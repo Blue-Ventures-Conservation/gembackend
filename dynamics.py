@@ -7,14 +7,18 @@ from project import tile_timeout
 from classification import combined_classification_lazy
 from assets import asset_error, make_export
 
-def dynamics_export(uid: str, target_class: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
+def dynamics_export(uid: str, vis: bool, target_class: str, red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
     try:
         _, _, lmask, pmask, gmask, coast = dynamics_masks(uid, target_class, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
-        print(lmask.bandNames().getInfo())
+
+        if vis == True:
+            lmask = lmask.visualize(palette = red)
+            pmask = pmask.visualize(palette = green)
+            gmask = gmask.visualize(palette = blue)
         
-        ltask = make_export(uid, lmask, coast)
-        ptask = make_export(uid, pmask, coast)
-        gtask = make_export(uid, gmask, coast)
+        ltask = make_export(uid, lmask, coast, "loss")
+        ptask = make_export(uid, pmask, coast, "persistence")
+        gtask = make_export(uid, gmask, coast, "gain")
         
         return {
             "loss": ltask,
@@ -57,7 +61,7 @@ def get_dynamics(uid: str, target_class: str, sub_regions: List[dict], red: str,
         raise asset_error(e)
 
 def dynamics_masks(uid: str, target_class: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
-    cont_class, hist_class, coast, class_map = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
+    cont_class, hist_class, coast, class_map = combined_classification_lazy(uid, False, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
     
     class_no = class_map.get(target_class)
     if class_no == None:

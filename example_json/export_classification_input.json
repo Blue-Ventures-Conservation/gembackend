@@ -1,9 +1,11 @@
 {
+"visualize": true,
 "contemporary_storage_key": "TAB_CRA_2020_210224_binary",
 "historical_storage_key": "TAB_CRA_2000_210301_binary",
 "use_cont_spec": false,
 "num_label": "Classvalue",
 "char_label": "Classname",
+"palette": ["#00FF00", "#FF0000", "#0000FF"],
 "roi": {
   "buff_dist":2500,
   "name":"my_roi",

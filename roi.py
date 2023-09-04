@@ -17,6 +17,8 @@ ls5_dataset = "LANDSAT/LT05/C02/T1_L2"
 ls7_dataset = "LANDSAT/LE07/C02/T1_L2"
 ls8_dataset = "LANDSAT/LC08/C02/T1_L2"
 ls9_dataset = "LANDSAT/LC09/C02/T1_L2"
+# B4, B5, B3 false color composite
+ls_visual = {'bands': ['Near IR', 'Shortwave IR 1', 'Red'], 'min': 0, 'max': 0.27}
 
 class NoContemporaryImages(Exception):
     pass
@@ -24,7 +26,7 @@ class NoContemporaryImages(Exception):
 class NoHistoricalImages(Exception):
     pass
 
-def ls_imagery_export(uid: str, roi: dict, buff_dist: int):
+def ls_imagery_export(uid: str, vis: bool, roi: dict, buff_dist: int):
     try:
         hhot, hlot = hist_imagery(roi, buff_dist)
     except NoImages:
@@ -34,14 +36,20 @@ def ls_imagery_export(uid: str, roi: dict, buff_dist: int):
         chot, clot = cont_imagery(roi, buff_dist)
     except NoImages:
         raise NoContemporaryImages()
+
+    if vis == True:
+        hhot = hhot.visualize(bands = ls_visual['bands'], min = ls_visual['min'], max = ls_visual['max'])
+        hlot = hlot.visualize(bands = ls_visual['bands'], min = ls_visual['min'], max = ls_visual['max'])
+        chot = chot.visualize(bands = ls_visual['bands'], min = ls_visual['min'], max = ls_visual['max'])
+        clot = clot.visualize(bands = ls_visual['bands'], min = ls_visual['min'], max = ls_visual['max'])
     
     coast = coastline(roi["polygon"])
     coast = coast.buffer(buff_dist)
     
-    hhot_task = make_export(uid, hhot, coast)
-    hlot_task = make_export(uid, hlot, coast)
-    chot_task = make_export(uid, chot, coast)
-    clot_task = make_export(uid, clot, coast)
+    hhot_task = make_export(uid, hhot, coast, "historical_high_tide")
+    hlot_task = make_export(uid, hlot, coast, "historical_low_tide")
+    chot_task = make_export(uid, chot, coast, "contemporary_high_tide")
+    clot_task = make_export(uid, clot, coast, "contemporary_low_tide")
     
     return {
         "chot": chot_task,
@@ -110,13 +118,10 @@ def visualize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
     except NoImages:
         raise NoContemporaryImages()
     
-    # B4, B5, B3 false color composite
-    vis = {'bands': ['Near IR', 'Shortwave IR 1', 'Red'], 'min': 0, 'max': 0.27}
-    
-    chot_url = chot.getMapId(vis)["tile_fetcher"].url_format
-    clot_url = clot.getMapId(vis)["tile_fetcher"].url_format
-    hhot_url = hhot.getMapId(vis)["tile_fetcher"].url_format
-    hlot_url = hlot.getMapId(vis)["tile_fetcher"].url_format
+    chot_url = chot.getMapId(ls_visual)["tile_fetcher"].url_format
+    clot_url = clot.getMapId(ls_visual)["tile_fetcher"].url_format
+    hhot_url = hhot.getMapId(ls_visual)["tile_fetcher"].url_format
+    hlot_url = hlot.getMapId(ls_visual)["tile_fetcher"].url_format
     
     return {
         "chot_url": chot_url,

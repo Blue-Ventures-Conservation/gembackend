@@ -9,14 +9,14 @@ asset_uid_path = asset_users_path+'{uid}'
 asset_users_table_path = asset_users_path+'{uid}/{key}'
 asset_default_bucket = '{project_id}.appspot.com'
 asset_user_shps = 'gs://{bucket}/users/{uid}/shps/{key}.zip'
-asset_user_downloads = 'users/{uid}/downloads/{slug}'
+asset_user_downloads = 'users/{uid}/downloads/{name}_{slug}'
 
 class MissingAsset(Exception):
     pass
 
-def make_export(uid: str, img: ee.Image, region: ee.Geometry) -> str:
+def make_export(uid: str, img: ee.Image, region: ee.Geometry, name: str) -> str:
     slug = uuid.uuid4().hex
-    fprefix = asset_user_downloads.format(uid = uid, slug = slug)
+    fprefix = asset_user_downloads.format(uid = uid, name = name, slug = slug)
     bucket = asset_default_bucket.format(project_id = project.project_id)
     task = ee.batch.Export.image.toCloudStorage(
         fileNamePrefix = fprefix,

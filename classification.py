@@ -26,12 +26,12 @@ def classification_error(e: Exception) -> Exception:
     else:
         return e
 
-def classification_export(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
+def classification_export(uid: str, vis: bool, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int):
     try:
-        cont_class, hist_class, coast, _ = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
+        cont_class, hist_class, coast, _ = combined_classification_lazy(uid, vis, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)
         
-        cont_task = make_export(uid, cont_class, coast)
-        hist_task = make_export(uid, hist_class, coast)
+        cont_task = make_export(uid, cont_class, coast, "contemporary_classification")
+        hist_task = make_export(uid, hist_class, coast, "historical_classification")
 
         return {
             "contemporary": cont_task,
@@ -59,10 +59,10 @@ def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spe
     except Exception as e:
         raise asset_error(e)
 
-def combined_classification_lazy(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.Geometry, Dict[str, int]]:
+def combined_classification_lazy(uid: str, vis: bool, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.Geometry, Dict[str, int]]:
     cont_combo, hist_combo, cont_t_poly, hist_t_poly, coast = combined_classification_prep(uid, cont_key, hist_key, use_cont_spec, num_label, roi, buff_dist)
-    cont_cmap, cont_classification = classify(cont_combo, cont_t_poly, coast, num_label, char_label)
-    hist_cmap, hist_classification = classify(hist_combo, hist_t_poly, coast, num_label, char_label)
+    cont_cmap, cont_classification = classify(vis, cont_combo, cont_t_poly, coast, num_label, char_label, palette)
+    hist_cmap, hist_classification = classify(vis, hist_combo, hist_t_poly, coast, num_label, char_label, palette)
     if cont_cmap != hist_cmap:
         raise Exception("class maps did not match between historical and contemporary CRAs during classification")
     
@@ -88,11 +88,11 @@ def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_con
     ht_poly = training_poly(uid, hist_key, num_label)
     return cont_combo, hist_combo, ct_poly, ht_poly, coast
 
-def classify(combo: ee.Image, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str) -> Tuple[Dict[str, int], ee.Image]:
-    _, cmap, classified, _, _, _ = classify_lazy(combo, t_poly, coast, num_label, char_label)
+def classify(vis: bool, combo: ee.Image, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: List[str]) -> Tuple[Dict[str, int], ee.Image]:
+    _, cmap, classified, _, _, _ = classify_lazy(vis, combo, t_poly, coast, num_label, char_label, palette)
     return cmap, classified
 
-def classify_lazy(combo: ee.Image, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str) -> Tuple[List[str], Dict[str, int], ee.Image, Any, ee.FeatureCollection, ee.FeatureCollection]:
+def classify_lazy(vis: bool, combo: ee.Image, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: List[str]) -> Tuple[List[str], Dict[str, int], ee.Image, Any, ee.FeatureCollection, ee.FeatureCollection]:
     bands = combo.bandNames()
     zipped = zipped_props(t_poly, num_label, char_label).getInfo()
     cmap = class_map(zipped)
@@ -116,11 +116,14 @@ def classify_lazy(combo: ee.Image, t_poly: ee.FeatureCollection, coast: ee.Geome
     )
     
     classified = combo.classify(classifier).clip(coast)
+
+    if vis == True:
+        v = visual(t_poly, num_label, palette)
+        classified = classified.visualize(palette = v['palette'], min = v['min'], max = v['max'])
+    
     return classes, cmap, classified, classifier, training, validation
 
-def classify_fully(combo: ee.Image, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: List[str]) -> Tuple[dict, List[str]]:
-    classes, _, classified, classifier, training, validation = classify_lazy(combo, t_poly, coast, num_label, char_label)
-
+def visual(t_poly: ee.FeatureCollection, num_label: str, palette: List[str]) -> dict:
     min_no = t_poly.reduceColumns(
         reducer = ee.Reducer.min(),
         selectors = [num_label]
@@ -130,12 +133,16 @@ def classify_fully(combo: ee.Image, t_poly: ee.FeatureCollection, coast: ee.Geom
         selectors = [num_label]
     ).get("max")
     
+    return {"min": min_no.getInfo(), "max": max_no.getInfo(), "palette": palette}
+
+def classify_fully(combo: ee.Image, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: List[str]) -> Tuple[dict, List[str]]:
+    classes, _, classified, classifier, training, validation = classify_lazy(False, combo, t_poly, coast, num_label, char_label)
+
     train_accuracy = classifier.confusionMatrix()
     validated = validation.classify(classifier)
     test_accuracy = validated.errorMatrix(num_label, "classification")
     
-    vis = {"min": min_no.getInfo(), "max": max_no.getInfo(), "palette": palette}
-    classification_url = classified.getMapId(vis)["tile_fetcher"].url_format
+    classification_url = classified.getMapId(visual(t_poly, num_label, palette))["tile_fetcher"].url_format
     
     return {
         "url": classification_url,

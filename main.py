@@ -109,7 +109,7 @@ def ls_imagery_route():
 def export_ls_imagery(uid: str):
     try:
         content = request.json
-        data = ls_imagery_export(uid, content, content["buff_dist"])
+        data = ls_imagery_export(uid, content["visualize"], content, content["buff_dist"])
     except Exception as e:
         return "", error_check("/export_roi_imagery", content, e)
     
@@ -164,7 +164,7 @@ def classification_route(uid: str):
 def export_classification(uid: str):
     try:
         content = request.json
-        data = classification_export(uid, content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
+        data = classification_export(uid, content["visualize"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["palette"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
         return "", error_check("/export_classification", content, e)
     
@@ -186,7 +186,7 @@ def dynamics_route(uid: str):
 def export_dynamics(uid: str):
     try:
         content = request.json
-        data = dynamics_export(uid, content["target_class"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
+        data = dynamics_export(uid, content["visualize"], content["target_class"], content["red"], content["green"], content["blue"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
         return "", error_check("/export_dynamics", content, e)
     
