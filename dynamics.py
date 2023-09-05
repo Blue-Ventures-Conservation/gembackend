@@ -5,7 +5,7 @@ from typing import List
 
 from project import tile_timeout
 from classification import combined_classification_lazy
-from assets import asset_error, make_export
+from assets import asset_error, make_export, asset_dl_timeout
 
 def dynamics_export(uid: str, vis: bool, target_class: str, red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
     try:
@@ -24,6 +24,8 @@ def dynamics_export(uid: str, vis: bool, target_class: str, red: str, green: str
             "loss": ltask,
             "persistence": ptask,
             "gain": gtask,
+            "created_at": int(time.time()),
+            "timeout": asset_dl_timeout
         }
     except Exception as e:
         raise asset_error(e)

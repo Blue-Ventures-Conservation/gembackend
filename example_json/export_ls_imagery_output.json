@@ -1,18 +1,20 @@
 {
   "chot": {
-    "task": "projects/earthengine-legacy/operations/CMZYXYBSPHMTTIDDFEX27R2K", 
-    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/contemporary_high_tide_c1e9212537a844ebb39ea592a7e07ef1.tif"
+    "task": "projects/earthengine-legacy/operations/XEBKNZO6OSH2BWWAFOZSKAXJ", 
+    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/contemporary_high_tide_babd7af98d1e496cbccc2b650a2eef6d.tif"
   }, 
   "clot": {
-    "task": "projects/earthengine-legacy/operations/DYNLAWFJH3JAWJIC5U6K5C63", 
-    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/contemporary_low_tide_f44bcbc361aa4794a96eec1108935921.tif"
+    "task": "projects/earthengine-legacy/operations/3YOE4ARWEQC4XQHQRM6WFFMU", 
+    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/contemporary_low_tide_8176ab9d22fd46fa9f2c2928a3e69fbb.tif"
   }, 
   "hhot": {
-    "task": "projects/earthengine-legacy/operations/RPWY2UDAJEHWB5NILKMDECYR", 
-    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/historical_high_tide_fb7dcb8888de41a1909414fdee18b77b.tif"
+    "task": "projects/earthengine-legacy/operations/66GVH37HN3B3HASQ26LW2HRO", 
+    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/historical_high_tide_c97c9c98bf41438fab807b945a6033a0.tif"
   }, 
   "hlot": {
-    "task": "projects/earthengine-legacy/operations/M5SZATQE57NBK3STKCFGVQJM", 
-    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/historical_low_tide_ed75736e727848c5b33a267718cb644c.tif"
-  }
+    "task": "projects/earthengine-legacy/operations/C2W5ZY57K74UILMEJBNLGKJU", 
+    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/historical_low_tide_7cc050eb5b7a40d28bddddd897f3d859.tif"
+  }, 
+  "created_at": 1693941284, 
+  "timeout": 82800
 }

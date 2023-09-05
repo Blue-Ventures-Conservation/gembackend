@@ -5,7 +5,7 @@ from typing import List, Tuple, Dict, Any
 
 from project import tile_timeout
 from roi import coastline, cont_imagery, hist_imagery, known_mangroves
-from assets import MissingAsset, make_export, asset_error, training_poly
+from assets import MissingAsset, make_export, asset_error, training_poly, asset_dl_timeout
 
 trees = 1000
 splits = 1
@@ -36,6 +36,8 @@ def classification_export(uid: str, vis: bool, cont_key: str, hist_key: str, use
         return {
             "contemporary": cont_task,
             "historical": hist_task,
+            "created_at": int(time.time()),
+            "timeout": asset_dl_timeout
         }
     except Exception as e:
         raise asset_error(e)

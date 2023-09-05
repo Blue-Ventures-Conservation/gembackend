@@ -1,7 +1,7 @@
 import ee, logging, uuid
 
 from typing import Tuple
-from time import sleep
+import time
 import project
 
 asset_users_path = 'projects/{project_id}/assets/users/'
@@ -10,6 +10,8 @@ asset_users_table_path = asset_users_path+'{uid}/{key}'
 asset_default_bucket = '{project_id}.appspot.com'
 asset_user_shps = 'gs://{bucket}/users/{uid}/shps/{key}.zip'
 asset_user_downloads = 'users/{uid}/downloads/{name}_{slug}'
+# 23 hours x 60 min x 60 min
+asset_dl_timeout = 23 * 60 * 60
 
 class MissingAsset(Exception):
     pass
@@ -87,7 +89,7 @@ def await_table_upload(uid: str, key: str, op: str) -> bool:
         if ok:
             return asset_exists(name)
         
-        sleep(10)
+        time.sleep(10)
 
 def check_operation(name: str) -> Tuple[bool, str]:
     try:

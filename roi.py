@@ -2,7 +2,7 @@ import ee
 import time
 from typing import Dict, List, Tuple
 from project import tile_timeout
-from assets import make_export
+from assets import make_export, asset_dl_timeout
 
 buffers = {
     '1 km': 1000, '2.5 km': 2500, '5 km': 5000, '7.5 km': 7500, '10 km': 10000, '12.5 km': 12500,
@@ -56,6 +56,8 @@ def ls_imagery_export(uid: str, vis: bool, roi: dict, buff_dist: int):
         "clot": clot_task,
         "hhot": hhot_task,
         "hlot": hlot_task,
+        "created_at": int(time.time()),
+        "timeout": asset_dl_timeout
     }
 
 def known_mangroves() -> ee.Image:
