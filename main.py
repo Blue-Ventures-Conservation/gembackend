@@ -164,7 +164,7 @@ def classification_route(uid: str):
 def export_classification(uid: str):
     try:
         content = request.json
-        data = classification_export(uid, content["visualize"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["palette"], content["roi"], content["roi"]["buff_dist"])
+        data = classification_export(uid, content["roi"]["visualize"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["palette"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
         return "", error_check("/export_classification", content, e)
     
@@ -186,7 +186,7 @@ def dynamics_route(uid: str):
 def export_dynamics(uid: str):
     try:
         content = request.json
-        data = dynamics_export(uid, content["visualize"], content["target_class"], content["red"], content["green"], content["blue"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
+        data = dynamics_export(uid, content["roi"]["visualize"], content["target_class"], content["red"], content["green"], content["blue"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
         return "", error_check("/export_dynamics", content, e)
     
@@ -200,15 +200,15 @@ def task_status(uid: str):
         ok, err = check_operation(content["task"])
         
         res = {
-            "status": False,
-            "err": None,
+            "success": False,
+            "error": None,
         }
         
         if err is not None:
-            res = {"status": False, "err": err}
+            res = {"success": False, "error": err}
         
         if ok:
-            res = {"status": True}
+            res = {"success": True}
         
     except Exception as e:
         return "", error_check("/task_status", content, e)

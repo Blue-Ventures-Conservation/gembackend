@@ -1,5 +1,4 @@
 {
-"visualize": true,
 "target_class": "Mangrove",
 "red": "FF0000",
 "green": "00FF00",
@@ -10,6 +9,7 @@
 "num_label": "Classvalue",
 "char_label": "Classname",
 "roi": {
+  "visualize": true,
   "buff_dist":2500,
   "name":"my_roi",
   "cont_year_start":2019,
