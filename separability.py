@@ -34,8 +34,9 @@ def scatter_chart(tpi: int, uid: str, key: str, num_label: str, char_label: str,
 # Returns dict of class name to list of dicts of band name to value. Values are reflectance for landsat, or index values.
 # Also contains an ordered list of classes at the root under 'classes'
 def scatter_chart_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> Dict[str, List[Dict[str, float]]]:
-    bands = img.bandNames().remove('B6')
-    lbands = bands.add(char_label)
+    bands = img.bandNames()
+    # add ID if present, harmless otherwise
+    lbands = bands.add(char_label).add("ID")
     sample = sample_image(img, training_poly(uid, key, num_label), num_label, char_label)
     feats = sample.select(
         propertySelectors = lbands,
@@ -76,7 +77,7 @@ def box_charts(tpi: int, uid: str, key: str, num_label: str, char_label: str, ro
 # Returns dict of class name to dict of band name to list of 5 values. Values are: [min, s1, mean, s2, max].
 # Also contains an ordered list of classes at the root under 'classes'
 def box_charts_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> Dict[str, Dict[str, List[float]]]:
-    bands = img.bandNames().remove('B6')
+    bands = img.bandNames()
     sample = sample_image(img, training_poly(uid, key, num_label), num_label, char_label)
     zipped = zipped_props(sample, num_label, char_label)
     ordered = ordered_classes(zipped.getInfo())
@@ -189,7 +190,7 @@ def correlation_matrix(tpi: int, uid: str, key: str, num_label: str, roi: dict, 
 # Returns a dict of band names to list of correlation values. Values are correlation between the band and the band at the indexed position.
 # Also contains an ordered list of bands at the root under 'bands'
 def pearson_correlation(img: ee.Image, t_poly: ee.FeatureCollection) -> Dict[str, List[float]]:
-    bands = img.bandNames().remove('B6')
+    bands = img.bandNames()
     local_bands = bands.getInfo()
     p1 = int(len(local_bands)/3)
     p2 = p1 + p1

@@ -193,9 +193,14 @@ def renamed_mndwi(img: ee.Image) -> ee.Image:
     return img.expression('(B2 - B5)/(B2 + B5)', {'B2': img.select('Green'), 'B5': img.select('Shortwave IR 1')}).rename(['MNDWI'])
 
 def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, char_label: str) -> ee.FeatureCollection:
+    props = [num_label, char_label]
+    
+    if t_poly.aggregate_count("ID").eq(t_poly.size()).getInfo() == 1:
+        props.append("ID")
+    
     return img.sampleRegions(
         collection = t_poly,
-        properties = [num_label, char_label],
+        properties = props,
         scale = 30,
         tileScale = 16
     )
