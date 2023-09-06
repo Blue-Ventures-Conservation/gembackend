@@ -195,25 +195,32 @@ def export_dynamics(uid: str):
 @app.route("/task_status", methods=["POST"])
 @token_check
 def task_status(uid: str):
+
+
     try:
         content = request.json
-        ok, err = check_operation(content["task"])
-        
-        res = {
-            "success": False,
-            "error": None,
-        }
-        
-        if err is not None:
-            res = {"success": False, "error": err}
-        
-        if ok:
-            res = {"success": True}
-        
+        tasks = content["tasks"]
+        results = {"results": []}
+
+        for task in tasks:
+            ok, err = check_operation(task)
+            
+            res = {
+                "success": False,
+                "error": None,
+            }
+            
+            if err is not None:
+                res = {"success": False, "error": err}
+            
+            if ok:
+                res = {"success": True}
+            
+            results["results"].append(res)
     except Exception as e:
         return "", error_check("/task_status", content, e)
     
-    return jsonify(res)
+    return jsonify(results)
 
 def error_check(route: str, content: dict, e: Exception) -> str:
     t = type(e)

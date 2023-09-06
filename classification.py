@@ -138,7 +138,7 @@ def visual(t_poly: ee.FeatureCollection, num_label: str, palette: List[str]) -> 
     return {"min": min_no.getInfo(), "max": max_no.getInfo(), "palette": palette}
 
 def classify_fully(combo: ee.Image, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: List[str]) -> Tuple[dict, List[str]]:
-    classes, _, classified, classifier, training, validation = classify_lazy(False, combo, t_poly, coast, num_label, char_label)
+    classes, _, classified, classifier, training, validation = classify_lazy(False, combo, t_poly, coast, num_label, char_label, palette)
 
     train_accuracy = classifier.confusionMatrix()
     validated = validation.classify(classifier)
