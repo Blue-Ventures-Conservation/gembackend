@@ -1,11 +1,11 @@
 {
   "contemporary": {
     "task": "projects/earthengine-legacy/operations/SLCWA7RT4VB37MZ4S7FO4LEK", 
-    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/contemporary_classification_23c4091b44134152ab251b97068c6fbe.tif"
+    "path": "users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/contemporary_classification_23c4091b44134152ab251b97068c6fbe.tif"
   }, 
   "historical": {
     "task": "projects/earthengine-legacy/operations/Z62AQTIJT72DZNE2FNZN3HR7", 
-    "path": "gem-project-378721.appspot.com/users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/historical_classification_3c6f46a8e7a547e6ac418a068a583a0e.tif"
+    "path": "users/4FRqmoJouHUQmYudmpUq9tN5Ob52/downloads/historical_classification_3c6f46a8e7a547e6ac418a068a583a0e.tif"
   }, 
   "created_at": 1693941255, 
   "timeout": 82800

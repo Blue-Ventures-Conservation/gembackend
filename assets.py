@@ -32,7 +32,7 @@ def make_export(uid: str, img: ee.Image, region: ee.Geometry, name: str) -> str:
     
     return {
         'task': task.status()['name'],
-        'path': bucket + '/' + fprefix + ".tif"
+        'path': fprefix + ".tif"
     }
 
 def asset_error(e: Exception) -> Exception:
