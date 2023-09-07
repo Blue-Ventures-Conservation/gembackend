@@ -196,7 +196,11 @@ def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, ch
     props = [num_label, char_label]
     
     if t_poly.aggregate_count("ID").eq(t_poly.size()).getInfo() == 1:
-        props.append("ID")
+        try:
+            isANum = t_poly.first().getNumber("ID").getInfo()
+            props.append("ID")
+        except:
+            pass
     
     return img.sampleRegions(
         collection = t_poly,
