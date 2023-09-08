@@ -7,7 +7,7 @@ from inspect import signature
 from functools import wraps
 from flask import Flask, request, abort, jsonify
 from firebase_admin import auth, credentials, initialize_app, storage
-from google.auth import compute_engine
+import google.auth
 import project
 from access import *
 from roi import *
@@ -32,7 +32,8 @@ if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""): # prod
     firebase_app = initialize_app()
     project.project_id = firebase_app.project_id
     accessor = Accessor()
-    ee.Initialize(compute_engine.Credentials(scopes=['https://www.googleapis.com/auth/earthengine', 'https://www.googleapis.com/auth/devstorage.read_write']))
+    credentials, _ = google.auth.default(scopes=['https://www.googleapis.com/auth/earthengine', 'https://www.googleapis.com/auth/devstorage.read_write'])
+    ee.Initialize(credentials)
     is_debug = False
 
 def token_check(func):
