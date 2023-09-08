@@ -32,7 +32,7 @@ if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""): # prod
     firebase_app = initialize_app()
     project.project_id = firebase_app.project_id
     accessor = Accessor()
-    credentials, _ = google.auth.default(scopes=['https://www.googleapis.com/auth/earthengine', 'https://www.googleapis.com/auth/devstorage.read_write'])
+    credentials, _ = google.auth.default()
     ee.Initialize(credentials)
     is_debug = False
 
