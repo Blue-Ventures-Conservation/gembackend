@@ -32,7 +32,7 @@ if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""): # prod
     firebase_app = initialize_app()
     project.project_id = firebase_app.project_id
     accessor = Accessor()
-    ee.Initialize(compute_engine.Credentials(scopes=['https://www.googleapis.com/auth/earthengine']))
+    ee.Initialize(compute_engine.Credentials(scopes=['https://www.googleapis.com/auth/earthengine', 'https://www.googleapis.com/auth/devstorage.read_write']))
     is_debug = False
 
 def token_check(func):
