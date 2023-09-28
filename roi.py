@@ -11,7 +11,7 @@ buffers = {
 default_indices = ["CMRI", "MMRI", "MNDWI", "SAVI"]
 cloud_cover_limit = 15
 tidal_zone = 1000
-default_min_avg = -1.0
+default_min_avg = 0.75
 ls4_dataset = "LANDSAT/LT04/C02/T1_L2"
 ls5_dataset = "LANDSAT/LT05/C02/T1_L2"
 ls7_dataset = "LANDSAT/LE07/C02/T1_L2"
@@ -293,12 +293,17 @@ def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry, m
             tileScale = 16
         )
         
-        # create single value to add to metatdata
+        # create single value to add to metadata
         cum_sum = ee.List(cum_val.values()).reduce(ee.Reducer.sum())
         # input that value into the image metadata as the property 'MNDWI'
         return img.set('MNDWI', ee.Number(cum_sum))
     
-    return ee.ImageCollection(imgs).map(mndwi_map).filter(ee.Filter.gte("MNDWI", min_avg))
+    m = ee.ImageCollection(imgs).map(mndwi_map)
+    
+    if m.filter(ee.Filter.gte("MNDWI", min_avg)).size().getInfo() == 0:
+        min_avg = 0.5
+    
+    return m.filter(ee.Filter.gte("MNDWI", min_avg))
 
 def tide_bands(imgs: ee.ImageCollection) -> ee.ImageCollection:
     # add a band to each image called MNDWI (created from the shoreRefl function)
