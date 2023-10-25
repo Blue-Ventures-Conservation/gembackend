@@ -10,8 +10,8 @@ asset_users_table_path = asset_users_path+'{uid}/{key}'
 asset_default_bucket = '{project_id}.appspot.com'
 asset_user_shps = 'gs://{bucket}/users/{uid}/shps/{key}.zip'
 asset_user_downloads = 'users/{uid}/downloads/{name}_{slug}'
-# 23 hours x 60 min x 60 min
-asset_dl_timeout = 23 * 60 * 60
+# 47 hours x 60 min x 60 min
+asset_dl_timeout = 47 * 60 * 60
 
 class MissingAsset(Exception):
     pass
