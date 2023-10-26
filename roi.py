@@ -151,15 +151,15 @@ def hlot_imagery(roi: dict, buff_dist: int) -> ee.ImageCollection:
     return hlot
 
 def cont_imagery(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
-    return get_imagery(buff_dist, roi.get("indices", default_indices), roi["polygon"], roi["cont_year_start"], roi["cont_year_end"], roi["cont_month_start"], roi["cont_month_end"], roi.get("min_avg", default_min_avg))
+    return get_imagery(buff_dist, roi.get("indices", default_indices), roi["polygon"], roi.get("excludes", []), roi["cont_year_start"], roi["cont_year_end"], roi["cont_month_start"], roi["cont_month_end"], roi.get("min_avg", default_min_avg))
     
 def hist_imagery(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
-    return get_imagery(buff_dist, roi.get("indices", default_indices), roi["polygon"], roi["hist_year_start"], roi["hist_year_end"], roi["hist_month_start"], roi["hist_month_end"], roi.get("min_avg", default_min_avg))
+    return get_imagery(buff_dist, roi.get("indices", default_indices), roi["polygon"], roi.get("excludes", []), roi["hist_year_start"], roi["hist_year_end"], roi["hist_month_start"], roi["hist_month_end"], roi.get("min_avg", default_min_avg))
     
 class NoImages(Exception):
     pass
 
-def get_imagery(buff_dist: int, indices: List[str], poly: dict, year1: int, year2: int, month1: int, month2: int, min_avg: float = -1.0) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
+def get_imagery(buff_dist: int, indices: List[str], poly: dict, excludes: List[dict], year1: int, year2: int, month1: int, month2: int, min_avg: float = -1.0) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
     coast = coastline(poly)
     poly = coast.buffer(buff_dist)
     zone = coast.simplify(500).buffer(tidal_zone).simplify(500)
@@ -189,11 +189,14 @@ def get_imagery(buff_dist: int, indices: List[str], poly: dict, year1: int, year
     imgs = imgs.map(apply_scale_factors).map(fix_float).map(doubleOO).map(cloud_mask)
     imgs = tide_bands(shore_refl(imgs, zone, poly, min_avg))
     
+    for exclude in excludes:
+        poly = poly.difference(exclude)
+    
     high_tide = ee.ImageCollection(imgs).qualityMosaic("MNDWI").select(['B1','B2','B3','B4','B5','B6','B7']).clip(poly)
     low_tide = ee.ImageCollection(imgs).qualityMosaic("inv_MNDWI").select(['B1','B2','B3','B4','B5','B6','B7']).clip(poly)
-
+    
     known_indices = []
-
+    
     for idx in indices:
         if idx == 'CMRI':
             high_tide = add_cmri(high_tide)
@@ -211,7 +214,7 @@ def get_imagery(buff_dist: int, indices: List[str], poly: dict, year1: int, year
             high_tide = add_savi(high_tide)
             low_tide = add_savi(low_tide)
             known_indices.append('SAVI')
-
+    
     # rename bands to human friendly names and ditch B6 (heat/LWIR)
     current_bands = ['B1','B2','B3','B4','B5','B7'] + known_indices
     renamed_bands = ['Blue', 'Green', 'Red', 'Near IR', 'Shortwave IR 1', 'Shortwave IR 2'] + known_indices

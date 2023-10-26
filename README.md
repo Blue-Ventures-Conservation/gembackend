@@ -34,6 +34,8 @@ You can post that to the local server like so, using curl:
 curl -v -H "Content-Type: application/json" -d @roi_input.json http://127.0.0.1:8080/roi
 ```
 
+A good tile to load in the browser for checking on the imagery is at `11/1301/1100`.
+
 ### IAM principal roles
 
 The backend uses a Firebase Admin SDK service account for pretty much everything. When Firebase is setup on a project, this service account is created automatically.
