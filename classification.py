@@ -167,7 +167,7 @@ def final_mask(coast: ee.Geometry, clot: ee.Image, hlot: ee.Image) -> ee.Image:
     return h2o_mask.multiply(tmask).eq(1)
 
 def topo_dsm() -> ee.Image:
-    dsm = ee.Image("JAXA/ALOS/AW3D30/V2_2").select("AVE_DSM").rename("elev")
+    dsm = ee.ImageCollection("JAXA/ALOS/AW3D30/V3_2").select("DSM").mosaic().rename("elev")
     slp_img = ee.Terrain.slope(ee.Image(dsm).select("elev")).double().rename("slope")
     return dsm.addBands(slp_img)
 
