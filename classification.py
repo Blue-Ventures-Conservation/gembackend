@@ -104,7 +104,7 @@ def classify_lazy(vis: bool, combo: ee.Image, sample: ee.FeatureCollection, t_po
     
     sample = sample.randomColumn(seed = 1)
     training = sample.filter(ee.Filter.lt("random", 0.7))
-    validation = sample.filter(ee.Filter.lt("random", 0.7))
+    validation = sample.filter(ee.Filter.gte("random", 0.7))
     classifier = ee.Classifier.smileRandomForest(
         numberOfTrees = trees,
         variablesPerSplit = splits,
@@ -167,7 +167,9 @@ def final_mask(coast: ee.Geometry, clot: ee.Image, hlot: ee.Image) -> ee.Image:
     return h2o_mask.multiply(tmask).eq(1)
 
 def topo_dsm() -> ee.Image:
-    dsm = ee.ImageCollection("JAXA/ALOS/AW3D30/V3_2").select("DSM").mosaic().rename("elev")
+    elev = ee.ImageCollection("JAXA/ALOS/AW3D30/V3_2").select("DSM")
+    proj = elev.first().select(0).projection()
+    dsm = elev.mosaic().setDefaultProjection(proj).rename("elev")
     slp_img = ee.Terrain.slope(ee.Image(dsm).select("elev")).double().rename("slope")
     return dsm.addBands(slp_img)
 
