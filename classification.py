@@ -44,7 +44,7 @@ def classification_export(uid: str, vis: bool, cont_key: str, hist_key: str, use
 
 def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int):
     try:
-        cont_combo, cont_sample, hist_combo, hist_sample, cont_t_poly, hist_t_poly, coast = combined_classification_prep(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
+        cont_combo, cont_sample, hist_combo, hist_sample, cont_t_poly, hist_t_poly, coast, palette = combined_classification_prep(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)
         cont_classification, cont_classes = classify_fully(cont_combo, cont_sample, cont_t_poly, coast, num_label, char_label, palette)
         hist_classification, hist_classes = classify_fully(hist_combo, hist_sample, hist_t_poly, coast, num_label, char_label, palette)
         
@@ -62,7 +62,7 @@ def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spe
         raise asset_error(e)
 
 def combined_classification_lazy(uid: str, vis: bool, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.Geometry, Dict[str, int]]:
-    cont_combo, cont_sample, hist_combo, hist_sample, cont_t_poly, hist_t_poly, coast = combined_classification_prep(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
+    cont_combo, cont_sample, hist_combo, hist_sample, cont_t_poly, hist_t_poly, coast, palette = combined_classification_prep(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)
     cont_cmap, cont_classification = classify(vis, cont_combo, cont_sample, cont_t_poly, coast, num_label, char_label, palette)
     hist_cmap, hist_classification = classify(vis, hist_combo, hist_sample, hist_t_poly, coast, num_label, char_label, palette)
     if cont_cmap != hist_cmap:
@@ -70,7 +70,7 @@ def combined_classification_lazy(uid: str, vis: bool, cont_key: str, hist_key: s
     
     return cont_classification, hist_classification, coast, cont_cmap
 
-def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry]:
+def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry]:
     coast = coastline(roi["polygon"])
     coast = coast.buffer(buff_dist)
     chot, clot = cont_imagery(roi, buff_dist)
@@ -90,13 +90,29 @@ def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_con
     if not use_cont_spec:
         hist_sample = sample_image(hist_combo, ht_poly, num_label, char_label)
     
-    return cont_combo, cont_sample, hist_combo, hist_sample, ct_poly, ht_poly, coast
+    def num_iter(next: ee.Number, carry: ee.Dictionary):
+        carry = ee.Dictionary(carry)
+        pos = ee.Number(carry.get('position'))
+        color = ee.List(carry.get('colors')).get(pos)
+        prev = ee.Number(carry.get('prev'))
+        out = ee.List(carry.get('output'))
+        diff = ee.Number(ee.Algorithms.If(pos.gt(0), ee.Number(next).subtract(prev), ee.Number(1)))
+        out = out.cat(ee.List.repeat(color, diff))
+        carry = carry.set('prev', ee.Number(next))
+        carry = carry.set('output', out)
+        carry = carry.set('position', pos.add(1))
+        return carry
+    
+    first = ee.Dictionary({"position": ee.Number(0), "prev": ee.Number(-1), "colors": ee.List(palette), "output": ee.List([])})
+    expanded_colors = ee.Dictionary(ct_poly.distinct(num_label).sort(num_label).aggregate_array(num_label).iterate(num_iter, first)).get('output')
+    
+    return cont_combo, cont_sample, hist_combo, hist_sample, ct_poly, ht_poly, coast, expanded_colors
 
-def classify(vis: bool, combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: List[str]) -> Tuple[Dict[str, int], ee.Image]:
+def classify(vis: bool, combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: ee.List) -> Tuple[Dict[str, int], ee.Image]:
     _, cmap, classified, _, _, _ = classify_lazy(vis, combo, sample, t_poly, coast, num_label, char_label, palette)
     return cmap, classified
 
-def classify_lazy(vis: bool, combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: List[str]) -> Tuple[List[str], Dict[str, int], ee.Image, Any, ee.FeatureCollection, ee.FeatureCollection]:
+def classify_lazy(vis: bool, combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: ee.List) -> Tuple[List[str], Dict[str, int], ee.Image, Any, ee.FeatureCollection, ee.FeatureCollection]:
     bands = combo.bandNames()
     zipped = zipped_props(t_poly, num_label, char_label).getInfo()
     cmap = class_map(zipped)
@@ -126,7 +142,7 @@ def classify_lazy(vis: bool, combo: ee.Image, sample: ee.FeatureCollection, t_po
     
     return classes, cmap, classified, classifier, training, validation
 
-def visual(t_poly: ee.FeatureCollection, num_label: str, palette: List[str]) -> dict:
+def visual(t_poly: ee.FeatureCollection, num_label: str, palette: ee.List) -> dict:
     min_no = t_poly.reduceColumns(
         reducer = ee.Reducer.min(),
         selectors = [num_label]
@@ -136,11 +152,11 @@ def visual(t_poly: ee.FeatureCollection, num_label: str, palette: List[str]) -> 
         selectors = [num_label]
     ).get("max")
     
-    return {"min": min_no.getInfo(), "max": max_no.getInfo(), "palette": palette}
+    return ee.Dictionary({"min": min_no, "max": max_no, "palette": palette}).getInfo()
 
-def classify_fully(combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: List[str]) -> Tuple[dict, List[str]]:
+def classify_fully(combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: ee.List) -> Tuple[dict, List[str]]:
     classes, _, classified, classifier, training, validation = classify_lazy(False, combo, sample, t_poly, coast, num_label, char_label, palette)
-
+    
     train_accuracy = classifier.confusionMatrix()
     validated = validation.classify(classifier)
     test_accuracy = validated.errorMatrix(num_label, "classification")
@@ -149,7 +165,7 @@ def classify_fully(combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.Fea
     
     train_acc = train_accuracy.accuracy().getInfo()
     test_acc = test_accuracy.accuracy().getInfo()
-
+    
     return {
         "url": classification_url,
         "resubstitution_accuracy": float(train_acc),

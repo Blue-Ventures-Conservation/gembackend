@@ -11,7 +11,7 @@ from assets import asset_error, make_export, asset_dl_timeout
 def dynamics_export(uid: str, vis: bool, target_class: str, red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
     try:
         _, _, lmask, pmask, gmask, coast = dynamics_masks(uid, target_class, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
-
+        
         if vis == True:
             lmask = lmask.visualize(palette = red)
             pmask = pmask.visualize(palette = green)
