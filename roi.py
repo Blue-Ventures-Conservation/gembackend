@@ -43,8 +43,7 @@ def ls_imagery_export(uid: str, vis: bool, roi: dict, buff_dist: int):
         chot = chot.visualize(bands = ls_visual['bands'], min = ls_visual['min'], max = ls_visual['max'])
         clot = clot.visualize(bands = ls_visual['bands'], min = ls_visual['min'], max = ls_visual['max'])
     
-    coast = coastline(roi["polygon"])
-    coast = coast.buffer(buff_dist)
+    coast = buffered_coastline(ee.Geometry(roi["polygon"]), buff_dist)
     
     hhot_task = make_export(uid, hhot, coast, "historical_high_tide")
     hlot_task = make_export(uid, hlot, coast, "historical_low_tide")
@@ -63,10 +62,17 @@ def ls_imagery_export(uid: str, vis: bool, roi: dict, buff_dist: int):
 def known_mangroves() -> ee.Image:
     return ee.ImageCollection("LANDSAT/MANGROVE_FORESTS").reduce(ee.Reducer.mean())
 
+def buffered_coastline(roi_poly: ee.Geometry, buffer_dist: int) -> ee.Geometry:
+    coast = coastline(roi_poly)
+    return coast.buffer(buff_dist).intersection(roi)
+
 # poly here should be the dict equivalent of a geojson polygon
-def coastline(poly: dict) -> ee.Geometry:
+def coastline(roi_poly: ee.Geometry) -> ee.Geometry:
+    mainlands = ee.FeatureCollection('projects/sat-io/open-datasets/shoreline/mainlands')
+    big_islands = ee.FeatureCollection('projects/sat-io/open-datasets/shoreline/big_islands')
+    small_islands = ee.FeatureCollection('projects/sat-io/open-datasets/shoreline/small_islands')
     # use the roi to clip the world boundary polygons
-    area = ee.FeatureCollection('USDOS/LSIB/2017').filterBounds(ee.Geometry(poly)).geometry()
+    area = mainlands.merge(big_islands).merge(small_islands).filterBounds(roi_poly).geometry()
 
     def geom_coords(geo: ee.Geometry) -> ee.List:
         return ee.Geometry(geo).coordinates()
@@ -77,36 +83,50 @@ def coastline(poly: dict) -> ee.Geometry:
     area_point = ee.Geometry.MultiPoint(area_coords)
     
     # select points in roi and convert to coordinate list
-    return area_point.intersection(ee.Geometry(poly), ee.ErrorMargin(1))
+    return area_point.intersection(roi_poly, ee.ErrorMargin(1))
 
-def area_chart(poly: dict) -> Dict[str, dict]:
+def area_chart(poly: dict, excludes: List[dict]) -> Dict[str, dict]:
     mang = known_mangroves()
-    coast = coastline(poly).simplify(1000)
+    roi = ee.Geometry(poly)
+    
+    excludeGeoms = []
+    for exclude in excludes:
+        excludeGeoms.append(ee.Geometry(exclude))
+    
+    def clipGeom(cst: ee.Geometry, buf: int) -> ee.Geometry:
+        buffed = cst.buffer(buf)
+        for excl in excludeGeoms:
+            buffed = buffed.difference(excl)
+        
+        return buffed.intersection(roi)
+    
+    coast = coastline(roi).simplify(1000)
     # create an image collection of various buffered mangroves, using the distance list
     mangrove_buff = ee.Image(mang) \
-        .addBands(mang.clip(coast.buffer(1000)).rename(['1'])) \
-        .addBands(mang.clip(coast.buffer(2500)).rename(['2'])) \
-        .addBands(mang.clip(coast.buffer(5000)).rename(['5'])) \
-        .addBands(mang.clip(coast.buffer(10000)).rename(['10'])) \
-        .addBands(mang.clip(coast.buffer(15000)).rename(['15'])) \
-        .addBands(mang.clip(coast.buffer(20000)).rename(['20']))
-
-    bands = mangrove_buff.bandNames().slice(1,8)
+        .addBands(mang.clip(clipGeom(coast, 1000)).rename(['1'])) \
+        .addBands(mang.clip(clipGeom(coast, 2500)).rename(['2'])) \
+        .addBands(mang.clip(clipGeom(coast, 5000)).rename(['5'])) \
+        .addBands(mang.clip(clipGeom(coast, 7500)).rename(['7'])) \
+        .addBands(mang.clip(clipGeom(coast, 10000)).rename(['10'])) \
+        .addBands(mang.clip(clipGeom(coast, 15000)).rename(['15'])) \
+        .addBands(mang.clip(clipGeom(coast, 20000)).rename(['20']))
+    
+    bands = mangrove_buff.bandNames().slice(1, 9)
     mangrove_buff = mangrove_buff.select(bands)
     
-    bands = ee.Image.pixelArea().addBands(mangrove_buff).bandNames().slice(1,8)
+    bands = ee.Image.pixelArea().addBands(mangrove_buff).bandNames().slice(1, 9)
     proc_img = mangrove_buff.select(bands)
     
     sums = proc_img.reduceRegion(
         reducer = ee.Reducer.sum(),
-        geometry = ee.Geometry(poly),
+        geometry = roi,
         scale = 30,
         maxPixels = 1e13,
         bestEffort = True
     ).getInfo()
     
     sums = dict(sorted(sums.items(), key=lambda x:x[1]))
-
+    
     return {"sums": {"keys": list(sums.keys()), "vals": [int(x) for x in list(sums.values())]}, "buffers": {"keys": list(buffers.keys()), "vals": list(buffers.values())}}
 
 def visualize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
@@ -160,15 +180,16 @@ class NoImages(Exception):
     pass
 
 def get_imagery(buff_dist: int, indices: List[str], poly: dict, excludes: List[dict], year1: int, year2: int, month1: int, month2: int, min_avg: float = -1.0) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
-    coast = coastline(poly)
-    poly = coast.buffer(buff_dist)
+    roi = ee.Geometry(poly)
+    coast = coastline(roi)
+    buffered_roi_poly = coast.buffer(buff_dist).intersection(roi)
     zone = coast.simplify(500).buffer(tidal_zone).simplify(500)
     
-    ls4 = ls4_imagery(poly, year1, year2, month1, month2)
-    ls5 = ls5_imagery(poly, year1, year2, month1, month2)
-    # ls7 = ls7_imagery(poly, year1, year2, month1, month2)
-    ls8 = ls8_imagery(poly, year1, year2, month1, month2)
-    ls9 = ls9_imagery(poly, year1, year2, month1, month2)
+    ls4 = ls4_imagery(buffered_roi_poly, year1, year2, month1, month2)
+    ls5 = ls5_imagery(buffered_roi_poly, year1, year2, month1, month2)
+    # ls7 = ls7_imagery(buffered_roi_poly, year1, year2, month1, month2)
+    ls8 = ls8_imagery(buffered_roi_poly, year1, year2, month1, month2)
+    ls9 = ls9_imagery(buffered_roi_poly, year1, year2, month1, month2)
     
     # rename bands
     oli_imgs = ee.ImageCollection(ls8.merge(ls9)) \
@@ -187,13 +208,13 @@ def get_imagery(buff_dist: int, indices: List[str], poly: dict, excludes: List[d
         raise NoImages()
     
     imgs = imgs.map(apply_scale_factors).map(fix_float).map(doubleOO).map(cloud_mask)
-    imgs = tide_bands(shore_refl(imgs, zone, poly, min_avg))
+    imgs = tide_bands(shore_refl(imgs, zone, buffered_roi_poly, min_avg))
     
     for exclude in excludes:
-        poly = poly.difference(exclude)
+        buffered_roi_poly = buffered_roi_poly.difference(exclude)
     
-    high_tide = ee.ImageCollection(imgs).qualityMosaic("MNDWI").select(['B1','B2','B3','B4','B5','B6','B7']).clip(poly)
-    low_tide = ee.ImageCollection(imgs).qualityMosaic("inv_MNDWI").select(['B1','B2','B3','B4','B5','B6','B7']).clip(poly)
+    high_tide = ee.ImageCollection(imgs).qualityMosaic("MNDWI").select(['B1','B2','B3','B4','B5','B6','B7']).clip(buffered_roi_poly)
+    low_tide = ee.ImageCollection(imgs).qualityMosaic("inv_MNDWI").select(['B1','B2','B3','B4','B5','B6','B7']).clip(buffered_roi_poly)
     
     known_indices = []
     
@@ -221,7 +242,7 @@ def get_imagery(buff_dist: int, indices: List[str], poly: dict, excludes: List[d
     high_tide = high_tide.select(current_bands, renamed_bands)
     low_tide = low_tide.select(current_bands, renamed_bands)
     
-    return high_tide.float().clip(poly), low_tide.float().clip(poly)
+    return high_tide.float(), low_tide.float()
 
 def ls4_imagery(poly: ee.Geometry, year1: int, year2: int, month1: int, month2: int) -> ee.ImageCollection:
     return filtered_ls(ls4_dataset, poly, year1, year2, month1, month2)

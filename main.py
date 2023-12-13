@@ -91,7 +91,7 @@ def await_table_upload_route(uid: str):
 @token_check
 def area_chart_route():
     content = request.json
-    chart_data = area_chart(content["polygon"])
+    chart_data = area_chart(content["polygon"], content["excludes"])
     return jsonify(chart_data)
 
 @app.route("/ls_imagery", methods=["POST"])
