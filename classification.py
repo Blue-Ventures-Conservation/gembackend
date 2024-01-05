@@ -70,7 +70,7 @@ def combined_classification_lazy(uid: str, vis: bool, cont_key: str, hist_key: s
     
     return cont_classification, hist_classification, coast, cont_cmap
 
-def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry]:
+def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry, ee.Geometry, ee.Geometry, ee.List]:
     coast = coastline(roi["polygon"])
     coast = coast.buffer(buff_dist)
     chot, clot = cont_imagery(roi, buff_dist)
@@ -90,21 +90,23 @@ def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_con
     if not use_cont_spec:
         hist_sample = sample_image(hist_combo, ht_poly, num_label, char_label)
     
-    def num_iter(next: ee.Number, carry: ee.Dictionary):
-        carry = ee.Dictionary(carry)
-        pos = ee.Number(carry.get('position'))
-        color = ee.List(carry.get('colors')).get(pos)
-        prev = ee.Number(carry.get('prev'))
-        out = ee.List(carry.get('output'))
-        diff = ee.Number(ee.Algorithms.If(pos.gt(0), ee.Number(next).subtract(prev), ee.Number(1)))
-        out = out.cat(ee.List.repeat(color, diff))
-        carry = carry.set('prev', ee.Number(next))
-        carry = carry.set('output', out)
-        carry = carry.set('position', pos.add(1))
-        return carry
-    
-    first = ee.Dictionary({"position": ee.Number(0), "prev": ee.Number(-1), "colors": ee.List(palette), "output": ee.List([])})
-    expanded_colors = ee.Dictionary(ct_poly.distinct(num_label).sort(num_label).aggregate_array(num_label).iterate(num_iter, first)).get('output')
+    expanded_colors = ee.List([])
+    if palette is not None:
+        def num_iter(next: ee.Number, carry: ee.Dictionary):
+            carry = ee.Dictionary(carry)
+            pos = ee.Number(carry.get('position'))
+            color = ee.List(carry.get('colors')).get(pos)
+            prev = ee.Number(carry.get('prev'))
+            out = ee.List(carry.get('output'))
+            diff = ee.Number(ee.Algorithms.If(pos.gt(0), ee.Number(next).subtract(prev), ee.Number(1)))
+            out = out.cat(ee.List.repeat(color, diff))
+            carry = carry.set('prev', ee.Number(next))
+            carry = carry.set('output', out)
+            carry = carry.set('position', pos.add(1))
+            return carry
+        
+        first = ee.Dictionary({"position": ee.Number(0), "prev": ee.Number(-1), "colors": ee.List(palette), "output": ee.List([])})
+        expanded_colors = ee.Dictionary(ct_poly.distinct(num_label).sort(num_label).aggregate_array(num_label).iterate(num_iter, first)).get('output')
     
     return cont_combo, cont_sample, hist_combo, hist_sample, ct_poly, ht_poly, coast, expanded_colors
 
