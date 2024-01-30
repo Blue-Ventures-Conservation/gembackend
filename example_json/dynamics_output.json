@@ -1,25 +1,209 @@
 {
-  "name": "my_roi", 
+  "created_at": 1706584697,
+  "gain_url": "https://earthengine.googleapis.com/v1/projects/earthengine-legacy/maps/27a73f09b75894b984a65b21b289e8ab-70615c6c8db3f8312f7bfbb3188de78c/tiles/{z}/{x}/{y}",
+  "loss_url": "https://earthengine.googleapis.com/v1/projects/earthengine-legacy/maps/c087537535015e90ded2b51e5847095f-c1ad55af77e1a8dd6af9882f3c04daa9/tiles/{z}/{x}/{y}",
+  "name": "my_roi",
+  "persistence_url": "https://earthengine.googleapis.com/v1/projects/earthengine-legacy/maps/ac7045a54f2bc8910b74cd1da1466ce2-9a09174e5517454e01fc574c76eb767d/tiles/{z}/{x}/{y}",
   "stats": {
-    "contemporary_area": 284285910.6087502, 
-    "historical_area": 300631334.9778578, 
-    "loss": 38036373.218945555, 
-    "persistence": 262594961.75891232, 
-    "gain": 21690948.84983796
-  }, 
-  "loss_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/2de3242a91fb5a22be538cc4cf9400fa-89e64a0de973e8fbfecddea2b1bda896/tiles/{z}/{x}/{y}", 
-  "persistence_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/a26705567a0496637b6044b2ad19c479-5f84d4b374fd4103635d39c5b3bd50d6/tiles/{z}/{x}/{y}", 
-  "gain_url": "https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/72fa9460aa7537ab2c49fe3d722b2724-e1c01a9cb29c80adea3387f86a291fa5/tiles/{z}/{x}/{y}", 
-  "created_at": 1690331699,
-  "timeout": 57600,
+    "all_classes": [
+      {
+        "cont": 232558467.28090626,
+        "conversions": {
+          "from": [
+            {
+              "area": 44094279.69586254,
+              "name": "Not Mangrove"
+            },
+            {
+              "area": 0,
+              "name": "Residual Water"
+            }
+          ],
+          "to": [
+            {
+              "area": 17097750.1493121,
+              "name": "Not Mangrove"
+            },
+            {
+              "area": 0,
+              "name": "Residual Water"
+            }
+          ]
+        },
+        "gain": 17097750.1493121,
+        "hist": 259554996.82745668,
+        "loss": 44094279.69586253,
+        "name": "Mangrove",
+        "persistence": 215460717.13159418
+      },
+      {
+        "cont": 262249984.79107738,
+        "conversions": {
+          "from": [
+            {
+              "area": 17097750.1493121,
+              "name": "Mangrove"
+            },
+            {
+              "area": 0,
+              "name": "Residual Water"
+            }
+          ],
+          "to": [
+            {
+              "area": 44094279.69586253,
+              "name": "Mangrove"
+            },
+            {
+              "area": 0,
+              "name": "Residual Water"
+            }
+          ]
+        },
+        "gain": 44094279.69586253,
+        "hist": 235253455.24452692,
+        "loss": 17097750.1493121,
+        "name": "Not Mangrove",
+        "persistence": 218155705.0952149
+      },
+      {
+        "cont": 0,
+        "conversions": {
+          "from": [
+            {
+              "area": 0,
+              "name": "Mangrove"
+            },
+            {
+              "area": 0,
+              "name": "Not Mangrove"
+            }
+          ],
+          "to": [
+            {
+              "area": 0,
+              "name": "Mangrove"
+            },
+            {
+              "area": 0,
+              "name": "Not Mangrove"
+            }
+          ]
+        },
+        "gain": 0,
+        "hist": 0,
+        "loss": 0,
+        "name": "Residual Water",
+        "persistence": 0
+      }
+    ],
+    "contemporary_area": 232558467.28090626,
+    "gain": 17097750.1493121,
+    "historical_area": 259554996.82745668,
+    "loss": 44094279.69586253,
+    "persistence": 215460717.13159418
+  },
   "sub_region_stats": [
     {
+      "all_classes": [
+        {
+          "cont": 34080332.19433474,
+          "conversions": {
+            "from": [
+              {
+                "area": 7331563.875762101,
+                "name": "Not Mangrove"
+              },
+              {
+                "area": 0,
+                "name": "Residual Water"
+              }
+            ],
+            "to": [
+              {
+                "area": 2440917.343788057,
+                "name": "Not Mangrove"
+              },
+              {
+                "area": 0,
+                "name": "Residual Water"
+              }
+            ]
+          },
+          "gain": 2440917.343788057,
+          "hist": 38970978.726308785,
+          "loss": 7331563.875762101,
+          "name": "Mangrove",
+          "persistence": 31639414.850546684
+        },
+        {
+          "cont": 33142630.190158024,
+          "conversions": {
+            "from": [
+              {
+                "area": 2440917.343788057,
+                "name": "Mangrove"
+              },
+              {
+                "area": 0,
+                "name": "Residual Water"
+              }
+            ],
+            "to": [
+              {
+                "area": 7331563.875762101,
+                "name": "Mangrove"
+              },
+              {
+                "area": 0,
+                "name": "Residual Water"
+              }
+            ]
+          },
+          "gain": 7331563.875762101,
+          "hist": 28251983.658183977,
+          "loss": 2440917.343788057,
+          "name": "Not Mangrove",
+          "persistence": 25811066.31439592
+        },
+        {
+          "cont": 0,
+          "conversions": {
+            "from": [
+              {
+                "area": 0,
+                "name": "Mangrove"
+              },
+              {
+                "area": 0,
+                "name": "Not Mangrove"
+              }
+            ],
+            "to": [
+              {
+                "area": 0,
+                "name": "Mangrove"
+              },
+              {
+                "area": 0,
+                "name": "Not Mangrove"
+              }
+            ]
+          },
+          "gain": 0,
+          "hist": 0,
+          "loss": 0,
+          "name": "Residual Water",
+          "persistence": 0
+        }
+      ],
+      "contemporary_area": 34080332.19433474,
+      "gain": 2440917.343788057,
+      "historical_area": 38970978.726308785,
+      "loss": 7331563.875762101,
       "name": "East Ambanja",
-      "contemporary_area": 39384134.79329212,
-      "historical_area": 41595235.17343056,
-      "loss": 4594441.333306526,
-      "persistence": 37000793.84012403,
-      "gain": 2383340.953168084
+      "persistence": 31639414.850546684
     }
-  ]
+  ],
+  "timeout": 57600
 }

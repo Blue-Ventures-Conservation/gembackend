@@ -1,5 +1,6 @@
 {
-"target_class": "Mangrove",
+"target_classes": ["Mangrove"],
+"combined_name": null,
 "red": "FF0000",
 "green": "00FF00",
 "blue": "0000FF",

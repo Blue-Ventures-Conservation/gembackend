@@ -1,22 +1,20 @@
 import ee
 import time
-import uuid
 
-from typing import List
+from typing import List, Tuple
 
 from project import tile_timeout
 from classification import combined_classification_lazy
 from assets import asset_error, make_export, asset_dl_timeout
 
-def dynamics_export(uid: str, vis: bool, target_class: str, red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
+def dynamics_export(uid: str, target_classes: List[str], combined_name: str, red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
     try:
-        _, _, lmask, pmask, gmask, coast = dynamics_masks(uid, target_class, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
+        class_num, _, classImgs, cont_class, hist_class, coast, sortedValues, sortedNames = class_images(uid, target_classes, combined_name, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
+        _, lmask, pmask, gmask = region_stats(True, coast, class_num, classImgs, cont_class, hist_class, sortedValues, sortedNames)
         
-        if vis == True:
-            lmask = lmask.visualize(palette = red)
-            pmask = pmask.visualize(palette = green)
-            gmask = gmask.visualize(palette = blue)
-        
+        lmask = lmask.visualize(palette = red)
+        pmask = pmask.visualize(palette = green)
+        gmask = gmask.visualize(palette = blue)
         ltask = make_export(uid, lmask, coast, "loss")
         ptask = make_export(uid, pmask, coast, "persistence")
         gtask = make_export(uid, gmask, coast, "gain")
@@ -31,33 +29,20 @@ def dynamics_export(uid: str, vis: bool, target_class: str, red: str, green: str
     except Exception as e:
         raise asset_error(e)
 
-def get_dynamics(uid: str, target_class: str, sub_regions: List[dict], red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
+def get_dynamics(uid: str, target_classes: List[str], combined_name: str, sub_regions: List[dict], red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
     try:
-        ctarget, htarget, lmask, pmask, gmask, coast = dynamics_masks(uid, target_class, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
-        
-        roi_lpg = lpg_do(ctarget, htarget, lmask, pmask, gmask, coast)
-        
-        slug = uuid.uuid4().hex
-        everything = ee.Dictionary({
-            slug: roi_lpg,
-        })
-        
-        for sr in sub_regions:
-            name = sr["name"]
-            lpg = lpg_do(ctarget, htarget, lmask, pmask, gmask, ee.Geometry(sr["geometry"]))
-            everything = everything.set(name, lpg)
-        
-        everything = everything.getInfo()
-        roi_lpg = everything[slug]
+        class_num, tpos, classImgs, cont_class, hist_class, roi_geo, sortedValues, sortedNames = class_images(uid, target_classes, combined_name, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
+        rstats, lmask, pmask, gmask  = region_stats(False, roi_geo, class_num, classImgs, cont_class, hist_class, sortedValues, sortedNames)
         
         output = {
             "name": roi["name"],
             "stats": {
-                "contemporary_area": roi_lpg["contemporary_area"],
-                "historical_area": roi_lpg["historical_area"],
-                "loss": roi_lpg["loss"],
-                "persistence": roi_lpg["persistence"],
-                "gain": roi_lpg["gain"],
+                "contemporary_area": rstats[tpos]["cont"],
+                "historical_area": rstats[tpos]["hist"],
+                "loss": rstats[tpos]["loss"],
+                "persistence": rstats[tpos]["persistence"],
+                "gain": rstats[tpos]["gain"],
+                "all_classes": rstats,
             },
             "loss_url": lpg_url(lmask, red),
             "persistence_url": lpg_url(pmask, green),
@@ -68,51 +53,134 @@ def get_dynamics(uid: str, target_class: str, sub_regions: List[dict], red: str,
         }
         
         for sr in sub_regions:
-            name = sr["name"]
-            lpg = everything[name]
-            output["sub_region_stats"].append({"name": name, "contemporary_area": lpg["contemporary_area"], "historical_area": lpg["historical_area"], "loss": lpg["loss"], "persistence": lpg["persistence"], "gain": lpg["gain"]})
+            stats, _, _, _ = region_stats(False, ee.Geometry(sr["geometry"]), class_num, classImgs, cont_class, hist_class, sortedValues, sortedNames)
+            output["sub_region_stats"].append({"name": sr["name"], "contemporary_area": stats[tpos]["cont"], "historical_area": stats[tpos]["hist"], "loss": stats[tpos]["loss"], "persistence": stats[tpos]["persistence"], "gain": stats[tpos]["gain"], "all_classes": stats})
         
         return output
     except Exception as e:
         raise asset_error(e)
 
-def dynamics_masks(uid: str, target_class: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
-    cont_class, hist_class, coast, class_map = combined_classification_lazy(uid, False, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
+def class_images(uid: str, target_classes: List[str], combined_name: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Tuple[int, int, ee.Dictionary, ee.Image, ee.Image, ee.Geometry, List[int], List[str]]:
+    cont_class, hist_class, coast, sorts = combined_classification_lazy(uid, False, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
+    sortedValues = sorts[0]
+    sortedNames = sorts[1]
     
-    class_no = class_map.get(target_class)
-    if class_no == None:
-        raise Exception("Target class not found in the CRA")
+    if len(target_classes) <= 0:
+        raise Exception("No target classes provided")
     
-    ctarget = cont_class.eq(class_no).clip(coast)
-    htarget = hist_class.eq(class_no).clip(coast)
-    lmask = htarget.subtract(ctarget).selfMask().rename('loss')
-    pmask = htarget.And(ctarget).selfMask().rename('persistence')
-    gmask = ctarget.subtract(htarget).selfMask().rename('gain')
-    ctarget = ctarget.selfMask()
-    htarget = htarget.selfMask()
+    class_name = target_classes[0]
+    tpos = sortedNames.index(class_name)
+    class_num = sortedValues[tpos]
     
-    return ctarget, htarget, lmask, pmask, gmask, coast
+    if len(target_classes) > 1:
+        sortedNames[tpos] = combined_name
+        cont_combo = cont_class.eq(class_num).multiply(class_num)
+        hist_combo = hist_class.eq(class_num).multiply(class_num)
+        cont_neg = cont_class.neq(class_num)
+        hist_neg = hist_class.neq(class_num)
+        
+        for idx, tc in enumerate(target_classes):
+            if idx == 0:
+                continue
+            
+            i = sortedNames.index(tc)
+            cn = sortedValues[i]
+            del(sortedValues[i])
+            del(sortedNames[i])
+            cont_combo = cont_combo.add(cont_class.eq(cn).multiply(class_num))
+            hist_combo = hist_combo.add(hist_class.eq(cn).multiply(class_num))
+            cont_neg = cont_neg.And(cont_class.neq(cn))
+            hist_neg = hist_neg.And(hist_class.neq(cn))
+        
+        cont_class = cont_class.multiply(cont_neg).add(cont_combo)
+        hist_class = hist_class.multiply(hist_neg).add(hist_combo)
+    
+    classImgs = ee.List([])
+    for p, n in enumerate(sortedValues):
+        classImgs = classImgs.add(ee.Dictionary({
+            "cont": cont_class.eq(n),
+            "hist": hist_class.eq(n)
+        }))
+    
+    return class_num, sortedValues.index(class_num), classImgs, cont_class, hist_class, coast, sortedValues, sortedNames
+
+def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: ee.Dictionary, cont_class: ee.Image, hist_class: ee.Image, sortedValues: List[int], sortedNames: List[str]) -> Tuple[List[dict], ee.Image, ee.Image, ee.Image]:
+    def contHist(pos):
+        cimgs = ee.Dictionary(classImgs.get(pos))
+        cont = ee.Image(cimgs.get("cont"))
+        hist = ee.Image(cimgs.get("hist"))
+        return cont, hist
+    
+    tloss = None
+    tpers = None
+    tgain = None
+    fetched = []
+    toFetch = []
+    
+    # loop through classes and get all stats for each
+    for p1, num in enumerate(sortedValues):
+        label = sortedNames[p1]
+        cont, hist = contHist(p1)
+        
+        to = ee.List([])
+        frm = ee.List([])
+        # to/from for all classes
+        for p2, nm in enumerate(sortedValues):
+            if p1 == p2:
+                continue
+            
+            cc, hc = contHist(p2)
+            lab = sortedNames[p2]
+            
+            to = to.add(ee.Dictionary({
+                "name": lab,
+                "area": maskArea(cont.And(hc).selfMask(), geo)
+            }))
+            frm = frm.add(ee.Dictionary({
+                "name": lab,
+                "area": maskArea(hist.And(cc).selfMask(), geo)
+            }))
+        
+        contArea = ee.Number(maskArea(cont.selfMask(), geo))
+        histArea = ee.Number(maskArea(hist.selfMask(), geo))
+        lossMask = hist.subtract(cont).eq(1).selfMask()
+        lossArea = ee.Number(maskArea(lossMask, geo))
+        perMask = hist.And(cont).selfMask()
+        perArea = ee.Number(maskArea(perMask, geo))
+        gainMask = cont.subtract(hist).eq(1).selfMask()
+        gainArea = ee.Number(maskArea(gainMask, geo))
+        
+        if class_num == num:
+            tloss = lossMask
+            tpers = perMask
+            tgain = gainMask
+        
+        if not masksOnly:
+            data = ee.Dictionary({
+                "name": label,
+                "loss": lossArea,
+                "persistence": perArea,
+                "gain": gainArea,
+                "hist": histArea,
+                "cont": contArea,
+                "conversions": {
+                    "to": to,
+                    "from": frm,
+                }
+            })
+            
+            toFetch.append(data)
+            if len(toFetch) >= 3:
+                fetched = fetched + ee.List(toFetch).getInfo()
+                toFetch.clear()
+
+    return fetched, tloss, tpers, tgain
 
 def lpg_url(mask: ee.Image, color: str) -> str:
     vis = {"palette": color}
     return mask.getMapId(vis)["tile_fetcher"].url_format
 
-def lpg_do(cont_mask: ee.Image, hist_mask: ee.Image, loss_mask: ee.Image, persist_mask: ee.Image, gain_mask: ee.Image, geo: ee.Geometry) -> ee.Dictionary:
-    ctotal = lpg_reduce(geo, cont_mask)
-    htotal = lpg_reduce(geo, hist_mask)
-    loss = lpg_reduce(geo, loss_mask)
-    persist = lpg_reduce(geo, persist_mask)
-    gain = lpg_reduce(geo, gain_mask)
-    
-    return ee.Dictionary({
-        "contemporary_area": ctotal,
-        "historical_area": htotal,
-        "loss": loss,
-        "persistence": persist,
-        "gain": gain,
-    })
-
-def lpg_reduce(geo: ee.Geometry, mask: ee.Image) -> float:
+def maskArea(mask: ee.Image, geo: ee.Geometry) -> float:
     return ee.Image.pixelArea().updateMask(mask).reduceRegion(
             reducer = ee.Reducer.sum(),
             geometry = geo,

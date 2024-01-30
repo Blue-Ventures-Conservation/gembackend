@@ -63,12 +63,12 @@ def combined_classification(uid: str, cont_key: str, hist_key: str, use_cont_spe
 
 def combined_classification_lazy(uid: str, vis: bool, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.Geometry, Dict[str, int]]:
     cont_combo, cont_sample, hist_combo, hist_sample, cont_t_poly, hist_t_poly, coast, palette = combined_classification_prep(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)
-    cont_cmap, cont_classification = classify(vis, cont_combo, cont_sample, cont_t_poly, coast, num_label, char_label, palette)
-    hist_cmap, hist_classification = classify(vis, hist_combo, hist_sample, hist_t_poly, coast, num_label, char_label, palette)
-    if cont_cmap != hist_cmap:
+    cont_sorts, cont_classification = classify(vis, cont_combo, cont_sample, cont_t_poly, coast, num_label, char_label, palette)
+    hist_sorts, hist_classification = classify(vis, hist_combo, hist_sample, hist_t_poly, coast, num_label, char_label, palette)
+    if cont_sorts != hist_sorts:
         raise Exception("class maps did not match between historical and contemporary CRAs during classification")
     
-    return cont_classification, hist_classification, coast, cont_cmap
+    return cont_classification, hist_classification, coast, cont_sorts
 
 def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry, ee.Geometry, ee.Geometry, ee.List]:
     coast = coastline(roi["polygon"])
@@ -110,15 +110,17 @@ def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_con
     
     return cont_combo, cont_sample, hist_combo, hist_sample, ct_poly, ht_poly, coast, expanded_colors
 
-def classify(vis: bool, combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: ee.List) -> Tuple[Dict[str, int], ee.Image]:
-    _, cmap, classified, _, _, _ = classify_lazy(vis, combo, sample, t_poly, coast, num_label, char_label, palette)
-    return cmap, classified
+def classify(vis: bool, combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: ee.List) -> Tuple[list, ee.Image]:
+    _, sorts, classified, _, _, _ = classify_lazy(vis, combo, sample, t_poly, coast, num_label, char_label, palette)
+    return sorts, classified
 
-def classify_lazy(vis: bool, combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: ee.List) -> Tuple[List[str], Dict[str, int], ee.Image, Any, ee.FeatureCollection, ee.FeatureCollection]:
+def classify_lazy(vis: bool, combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: ee.List) -> Tuple[List[str], list, ee.Image, Any, ee.FeatureCollection, ee.FeatureCollection]:
     bands = combo.bandNames()
-    zipped = zipped_props(t_poly, num_label, char_label).getInfo()
-    cmap = class_map(zipped)
-    classes = ordered_classes(zipped)
+    sorts = ee.FeatureCollection(t_poly).distinct(num_label).sort(num_label);
+    nums = sorts.aggregate_array(num_label);
+    chars = sorts.aggregate_array(char_label);
+    sorteds = ee.List([nums, chars]).getInfo()
+    classes = ordered_classes(list(map(list, zip(sorteds[0], sorteds[1]))))
     
     sample = sample.randomColumn(seed = 1)
     training = sample.filter(ee.Filter.lt("random", 0.7))
@@ -142,7 +144,7 @@ def classify_lazy(vis: bool, combo: ee.Image, sample: ee.FeatureCollection, t_po
         v = visual(t_poly, num_label, palette)
         classified = classified.visualize(palette = v['palette'], min = v['min'], max = v['max'])
     
-    return classes, cmap, classified, classifier, training, validation
+    return classes, sorteds, classified, classifier, training, validation
 
 def visual(t_poly: ee.FeatureCollection, num_label: str, palette: ee.List) -> dict:
     min_no = t_poly.reduceColumns(
@@ -232,18 +234,6 @@ def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, ch
         scale = 30,
         tileScale = 16
     )
-
-def zipped_props(sample: ee.FeatureCollection, num_label: str, char_label: str) -> List[str]:
-    nums = sample.distinct(num_label).aggregate_array(num_label)
-    chars = sample.distinct(char_label).aggregate_array(char_label)
-    return nums.zip(chars).sort(nums)
-
-def class_map(zipped: list) -> Dict[str, int]:
-    cm = {}
-    for z in zipped:
-        cm[z[1]] = int(z[0])
-    
-    return cm
 
 def ordered_classes(zipped: list) -> List[str]:
     ordered = []

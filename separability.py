@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple
 
 from enum import Enum
 from roi import chot_imagery, clot_imagery, hhot_imagery, hlot_imagery
-from classification import sample_image, zipped_props, ordered_classes
+from classification import sample_image, ordered_classes
 from assets import asset_error, training_poly
 
 class InvalidTimePeriod(Exception):
@@ -228,3 +228,8 @@ def correlation_cell(img: ee.Image, t_poly: ee.FeatureCollection) -> ee.Number:
         scale = 150,
         tileScale = 16
     ).get('correlation')
+
+def zipped_props(sample: ee.FeatureCollection, num_label: str, char_label: str) -> List[str]:
+    nums = sample.distinct(num_label).aggregate_array(num_label)
+    chars = sample.distinct(char_label).aggregate_array(char_label)
+    return nums.zip(chars).sort(nums)

@@ -176,7 +176,8 @@ def export_classification(uid: str):
 def dynamics_route(uid: str):
     try:
         content = request.json
-        data = get_dynamics(uid, content["target_class"], content["sub_regions"], content["red"], content["green"], content["blue"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
+        targets = dynamics_target_classes(content)
+        data = get_dynamics(uid, targets, content.get("combined_name", targets[0]), content["sub_regions"], content["red"], content["green"], content["blue"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
         return "", error_check("/dynamics", content, e)
     
@@ -187,17 +188,24 @@ def dynamics_route(uid: str):
 def export_dynamics(uid: str):
     try:
         content = request.json
-        data = dynamics_export(uid, content["roi"]["visualize"], content["target_class"], content["red"], content["green"], content["blue"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
+        targets = dynamics_target_classes(content)
+        data = dynamics_export(uid, targets, content.get("combined_name", targets[0]), content["red"], content["green"], content["blue"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
         return "", error_check("/export_dynamics", content, e)
     
     return jsonify(data)
 
+def dynamics_target_classes(content: dict):
+    targets = content.get("target_classes", None)
+    if targets is None:
+        target = content.get("target_class", None)
+        targets = [] if target is None else [target]
+    
+    return targets
+
 @app.route("/task_status", methods=["POST"])
 @token_check
 def task_status(uid: str):
-
-
     try:
         content = request.json
         tasks = content["tasks"]
