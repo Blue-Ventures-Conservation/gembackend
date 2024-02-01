@@ -44,7 +44,6 @@ def make_image_assets(uid: str, imgs: List[ee.Image], keys: List[str], region: e
     for i, img in enumerate(imgs):
         key = keys[i]
         asset_id = asset_name(uid, key)
-        print(asset_id)
         
         task = ee.batch.Export.image.toAsset(
             image = img,
