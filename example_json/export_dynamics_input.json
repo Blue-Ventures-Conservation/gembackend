@@ -10,6 +10,7 @@
 "num_label": "Classvalue",
 "char_label": "Classname",
 "roi": {
+  "region_uuid": "unique_string_1234",
   "visualize": true,
   "buff_dist":2500,
   "name":"my_roi",

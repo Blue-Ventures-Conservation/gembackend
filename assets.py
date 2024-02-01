@@ -1,6 +1,6 @@
 import ee, logging, uuid
 
-from typing import Tuple
+from typing import Tuple, List
 import time
 import project
 
@@ -34,6 +34,36 @@ def make_export(uid: str, img: ee.Image, region: ee.Geometry, name: str) -> str:
         'task': task.status()['name'],
         'path': fprefix + ".tif"
     }
+
+def make_image_assets(uid: str, imgs: List[ee.Image], keys: List[str], region: ee.Geometry, wait: bool) -> List[str]:
+    if not create_user_asset_folder(uid):
+        return None
+    
+    assets = []
+    ops = []
+    for i, img in enumerate(imgs):
+        key = keys[i]
+        asset_id = asset_name(uid, key)
+        print(asset_id)
+        
+        task = ee.batch.Export.image.toAsset(
+            image = img,
+            assetId = asset_id,
+            region = region,
+            scale = 30,
+            maxPixels = 1e13,
+        )
+        task.start()
+        assets.append(asset_id)
+        ops.append(task.status()['name'])
+    
+    if wait:
+        for i, key in enumerate(keys):
+            op = ops[i]
+            if not await_asset(uid, key, op):
+                return None
+    
+    return assets
 
 def asset_error(e: Exception) -> Exception:
     estr = str(e)
@@ -75,7 +105,7 @@ def upload_table_asset(uid: str, key: str) -> Tuple[str, bool]:
     except:
         return "", False
 
-def await_table_upload(uid: str, key: str, op: str) -> bool:
+def await_asset(uid: str, key: str, op: str) -> bool:
     name = asset_name(uid, key)
     if asset_exists(name):
         return True

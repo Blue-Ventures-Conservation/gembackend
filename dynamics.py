@@ -4,13 +4,14 @@ import time
 from typing import List, Tuple
 
 from project import tile_timeout
-from classification import combined_classification_lazy
+from classification import check_for_classified_imagery, combined_classification_lazy
 from assets import asset_error, make_export, asset_dl_timeout
 
-def dynamics_export(uid: str, target_classes: List[str], combined_name: str, red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
+def dynamics_export(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
     try:
-        class_num, _, classImgs, cont_class, hist_class, coast, sortedValues, sortedNames = class_images(uid, target_classes, combined_name, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
-        _, lmask, pmask, gmask = region_stats(True, coast, class_num, classImgs, cont_class, hist_class, sortedValues, sortedNames)
+        class_num, _, cont_class, hist_class, coast, sortedValues, sortedNames = combine_classes(uid,region_uuid, target_classes, combined_name, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
+        classImgs = class_images(cont_class, hist_class, sortedValues)
+        _, lmask, pmask, gmask = region_stats(True, coast, class_num, classImgs, sortedValues, sortedNames)
         
         lmask = lmask.visualize(palette = red)
         pmask = pmask.visualize(palette = green)
@@ -29,10 +30,11 @@ def dynamics_export(uid: str, target_classes: List[str], combined_name: str, red
     except Exception as e:
         raise asset_error(e)
 
-def get_dynamics(uid: str, target_classes: List[str], combined_name: str, sub_regions: List[dict], red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
+def get_dynamics(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, sub_regions: List[dict], red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
     try:
-        class_num, tpos, classImgs, cont_class, hist_class, roi_geo, sortedValues, sortedNames = class_images(uid, target_classes, combined_name, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
-        rstats, lmask, pmask, gmask  = region_stats(False, roi_geo, class_num, classImgs, cont_class, hist_class, sortedValues, sortedNames)
+        class_num, tpos, cont_class, hist_class, roi_geo, sortedValues, sortedNames = combine_classes(uid, region_uuid, target_classes, combined_name, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
+        classImgs = class_images(cont_class, hist_class, sortedValues)
+        rstats, lmask, pmask, gmask  = region_stats(False, roi_geo, class_num, classImgs, sortedValues, sortedNames)
         
         output = {
             "name": roi["name"],
@@ -53,15 +55,25 @@ def get_dynamics(uid: str, target_classes: List[str], combined_name: str, sub_re
         }
         
         for sr in sub_regions:
-            stats, _, _, _ = region_stats(False, ee.Geometry(sr["geometry"]), class_num, classImgs, cont_class, hist_class, sortedValues, sortedNames)
+            stats, _, _, _ = region_stats(False, ee.Geometry(sr["geometry"]), class_num, classImgs, sortedValues, sortedNames)
             output["sub_region_stats"].append({"name": sr["name"], "contemporary_area": stats[tpos]["cont"], "historical_area": stats[tpos]["hist"], "loss": stats[tpos]["loss"], "persistence": stats[tpos]["persistence"], "gain": stats[tpos]["gain"], "all_classes": stats})
         
         return output
     except Exception as e:
         raise asset_error(e)
 
-def class_images(uid: str, target_classes: List[str], combined_name: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Tuple[int, int, ee.Dictionary, ee.Image, ee.Image, ee.Geometry, List[int], List[str]]:
+def class_images(cont_class: ee.Image, hist_class: ee.Image, sortedValues: List[int]) -> ee.List:
+    classImgs = ee.List([])
+    for p, n in enumerate(sortedValues):
+        classImgs = classImgs.add(ee.Dictionary({
+            "cont": cont_class.eq(n),
+            "hist": hist_class.eq(n)
+        }))
+    return classImgs
+
+def combine_classes(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Tuple[int, int, ee.Dictionary, ee.Image, ee.Image, ee.Geometry, List[int], List[str]]:
     cont_class, hist_class, coast, sorts = combined_classification_lazy(uid, False, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
+    cont_class, hist_class = check_for_classified_imagery(uid, region_uuid, cont_class, hist_class)
     sortedValues = sorts[0]
     sortedNames = sorts[1]
     
@@ -94,17 +106,10 @@ def class_images(uid: str, target_classes: List[str], combined_name: str, cont_k
         
         cont_class = cont_class.multiply(cont_neg).add(cont_combo)
         hist_class = hist_class.multiply(hist_neg).add(hist_combo)
-    
-    classImgs = ee.List([])
-    for p, n in enumerate(sortedValues):
-        classImgs = classImgs.add(ee.Dictionary({
-            "cont": cont_class.eq(n),
-            "hist": hist_class.eq(n)
-        }))
-    
-    return class_num, sortedValues.index(class_num), classImgs, cont_class, hist_class, coast, sortedValues, sortedNames
+     
+    return class_num, sortedValues.index(class_num), cont_class, hist_class, coast, sortedValues, sortedNames
 
-def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: ee.Dictionary, cont_class: ee.Image, hist_class: ee.Image, sortedValues: List[int], sortedNames: List[str]) -> Tuple[List[dict], ee.Image, ee.Image, ee.Image]:
+def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: ee.Dictionary, sortedValues: List[int], sortedNames: List[str]) -> Tuple[List[dict], ee.Image, ee.Image, ee.Image]:
     def contHist(pos):
         cimgs = ee.Dictionary(classImgs.get(pos))
         cont = ee.Image(cimgs.get("cont"))

@@ -84,7 +84,7 @@ def upload_table_route(uid: str):
 @token_check
 def await_table_upload_route(uid: str):
     content = request.json
-    success = await_table_upload(uid, content["key"], content["name"])
+    success = await_asset(uid, content["key"], content["name"])
     return jsonify({'success': success})
 
 @app.route("/area_chart", methods=["POST"])
@@ -154,7 +154,7 @@ def corr_route(uid: str):
 def classification_route(uid: str):
     try:
         content = request.json
-        data = combined_classification(uid, content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["palette"], content["roi"], content["roi"]["buff_dist"])
+        data = combined_classification(uid, content["roi"].get("region_uuid", None), content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["palette"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
         return "", error_check("/classification", content, e)
     
@@ -165,7 +165,7 @@ def classification_route(uid: str):
 def export_classification(uid: str):
     try:
         content = request.json
-        data = classification_export(uid, content["roi"]["visualize"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["palette"], content["roi"], content["roi"]["buff_dist"])
+        data = classification_export(uid, content["roi"].get("region_uuid", None), content["roi"]["visualize"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["palette"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
         return "", error_check("/export_classification", content, e)
     
@@ -177,7 +177,7 @@ def dynamics_route(uid: str):
     try:
         content = request.json
         targets = dynamics_target_classes(content)
-        data = get_dynamics(uid, targets, content.get("combined_name", targets[0]), content["sub_regions"], content["red"], content["green"], content["blue"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
+        data = get_dynamics(uid, content["roi"].get("region_uuid", None), targets, content.get("combined_name", targets[0]), content["sub_regions"], content["red"], content["green"], content["blue"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
         return "", error_check("/dynamics", content, e)
     
@@ -189,7 +189,7 @@ def export_dynamics(uid: str):
     try:
         content = request.json
         targets = dynamics_target_classes(content)
-        data = dynamics_export(uid, targets, content.get("combined_name", targets[0]), content["red"], content["green"], content["blue"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
+        data = dynamics_export(uid, content["roi"].get("region_uuid", None), targets, content.get("combined_name", targets[0]), content["red"], content["green"], content["blue"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
         return "", error_check("/export_dynamics", content, e)
     
