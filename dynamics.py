@@ -190,12 +190,12 @@ def lpg_url(mask: ee.Image, color: str) -> str:
     vis = {"palette": color}
     return mask.getMapId(vis)["tile_fetcher"].url_format
 
-def maskArea(mask: ee.Image, geo: ee.Geometry) -> float:
-    return ee.Image.pixelArea().updateMask(mask).reduceRegion(
+def maskArea(mask: ee.Image, geo: ee.Geometry) -> ee.Number:
+    return ee.Number(ee.Image.pixelArea().updateMask(mask).reduceRegion(
             reducer = ee.Reducer.sum(),
             geometry = geo,
             scale = 30,
             maxPixels = 1e13,
             bestEffort = True,
             tileScale = 8,
-    ).get("area")
+    ).get("area")).round()

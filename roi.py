@@ -103,21 +103,18 @@ def area_chart(poly: dict, excludes: List[dict]) -> Dict[str, dict]:
     coast = coastline(roi).simplify(1000)
     # create an image collection of various buffered mangroves, using the distance list
     mangrove_buff = ee.Image(mang) \
-        .addBands(mang.clip(clipGeom(coast, 1000)).rename(['1'])) \
-        .addBands(mang.clip(clipGeom(coast, 2500)).rename(['2'])) \
-        .addBands(mang.clip(clipGeom(coast, 5000)).rename(['5'])) \
-        .addBands(mang.clip(clipGeom(coast, 7500)).rename(['7'])) \
-        .addBands(mang.clip(clipGeom(coast, 10000)).rename(['10'])) \
-        .addBands(mang.clip(clipGeom(coast, 15000)).rename(['15'])) \
-        .addBands(mang.clip(clipGeom(coast, 20000)).rename(['20']))
+        .addBands(ee.Image.pixelArea().updateMask(mang.clip(clipGeom(coast, 1000))).rename(['1'])) \
+        .addBands(ee.Image.pixelArea().updateMask(mang.clip(clipGeom(coast, 2500))).rename(['2'])) \
+        .addBands(ee.Image.pixelArea().updateMask(mang.clip(clipGeom(coast, 5000))).rename(['5'])) \
+        .addBands(ee.Image.pixelArea().updateMask(mang.clip(clipGeom(coast, 7500))).rename(['7'])) \
+        .addBands(ee.Image.pixelArea().updateMask(mang.clip(clipGeom(coast, 10000))).rename(['10'])) \
+        .addBands(ee.Image.pixelArea().updateMask(mang.clip(clipGeom(coast, 15000))).rename(['15'])) \
+        .addBands(ee.Image.pixelArea().updateMask(mang.clip(clipGeom(coast, 20000))).rename(['20']))
     
     bands = mangrove_buff.bandNames().slice(1, 9)
     mangrove_buff = mangrove_buff.select(bands)
     
-    bands = ee.Image.pixelArea().addBands(mangrove_buff).bandNames().slice(1, 9)
-    proc_img = mangrove_buff.select(bands)
-    
-    sums = proc_img.reduceRegion(
+    sums = mangrove_buff.reduceRegion(
         reducer = ee.Reducer.sum(),
         geometry = roi,
         scale = 30,
