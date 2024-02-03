@@ -179,7 +179,11 @@ def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: e
             if len(toFetch) >= 3:
                 fetched = fetched + ee.List(toFetch).getInfo()
                 toFetch.clear()
-
+    
+    if len(toFetch) > 0:
+        fetched = fetched + ee.List(toFetch).getInfo()
+        toFetch.clear()
+    
     return fetched, tloss, tpers, tgain
 
 def lpg_url(mask: ee.Image, color: str) -> str:
