@@ -39,6 +39,7 @@ def get_dynamics(uid: str, region_uuid: str, target_classes: List[str], combined
         output = {
             "name": roi["name"],
             "stats": {
+                "name": roi["name"],
                 "contemporary_area": rstats[tpos]["cont"],
                 "historical_area": rstats[tpos]["hist"],
                 "loss": rstats[tpos]["loss"],

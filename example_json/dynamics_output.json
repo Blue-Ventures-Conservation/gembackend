@@ -1,8 +1,8 @@
 {
+  "name": "my_roi",
   "created_at": 1706584697,
   "gain_url": "https://earthengine.googleapis.com/v1/projects/earthengine-legacy/maps/27a73f09b75894b984a65b21b289e8ab-70615c6c8db3f8312f7bfbb3188de78c/tiles/{z}/{x}/{y}",
   "loss_url": "https://earthengine.googleapis.com/v1/projects/earthengine-legacy/maps/c087537535015e90ded2b51e5847095f-c1ad55af77e1a8dd6af9882f3c04daa9/tiles/{z}/{x}/{y}",
-  "name": "my_roi",
   "persistence_url": "https://earthengine.googleapis.com/v1/projects/earthengine-legacy/maps/ac7045a54f2bc8910b74cd1da1466ce2-9a09174e5517454e01fc574c76eb767d/tiles/{z}/{x}/{y}",
   "stats": {
     "all_classes": [
@@ -101,6 +101,7 @@
     "gain": 17097750.1493121,
     "historical_area": 259554996.82745668,
     "loss": 44094279.69586253,
+    "name": "my_roi",
     "persistence": 215460717.13159418
   },
   "sub_region_stats": [
