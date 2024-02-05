@@ -62,9 +62,9 @@ def ls_imagery_export(uid: str, vis: bool, roi: dict, buff_dist: int):
 def known_mangroves() -> ee.Image:
     return ee.ImageCollection("LANDSAT/MANGROVE_FORESTS").reduce(ee.Reducer.mean())
 
-def buffered_coastline(roi_poly: ee.Geometry, buffer_dist: int) -> ee.Geometry:
+def buffered_coastline(roi_poly: ee.Geometry, buff_dist: int) -> ee.Geometry:
     coast = coastline(roi_poly)
-    return coast.buffer(buff_dist).intersection(roi)
+    return coast.buffer(buff_dist).intersection(roi_poly)
 
 # poly here should be the dict equivalent of a geojson polygon
 def coastline(roi_poly: ee.Geometry) -> ee.Geometry:
