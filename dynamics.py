@@ -65,7 +65,7 @@ def get_dynamics(uid: str, region_uuid: str, target_classes: List[str], combined
 
 def class_images(cont_class: ee.Image, hist_class: ee.Image, sortedValues: List[int]) -> ee.List:
     classImgs = ee.List([])
-    for p, n in enumerate(sortedValues):
+    for n in sortedValues:
         classImgs = classImgs.add(ee.Dictionary({
             "cont": cont_class.eq(n),
             "hist": hist_class.eq(n)
@@ -74,7 +74,7 @@ def class_images(cont_class: ee.Image, hist_class: ee.Image, sortedValues: List[
 
 def combine_classes(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Tuple[int, int, ee.Dictionary, ee.Image, ee.Image, ee.Geometry, List[int], List[str]]:
     cont_class, hist_class, coast, sorts = combined_classification_lazy(uid, False, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
-    cont_class, hist_class = check_for_classified_imagery(uid, region_uuid, coast, cont_class, hist_class)
+    cont_class, hist_class = check_for_classified_imagery(uid, region_uuid, coast, True, cont_class, hist_class)
     sortedValues = sorts[0]
     sortedNames = sorts[1]
     

@@ -29,7 +29,7 @@ def classification_error(e: Exception) -> Exception:
     else:
         return e
 
-def check_for_classified_imagery(uid: str, region_uuid: str, region: ee.Geometry, lazy_cont: ee.Image, lazy_hist: ee.Image) -> Tuple[ee.Image, ee.Image]:
+def check_for_classified_imagery(uid: str, region_uuid: str, region: ee.Geometry, make: bool, lazy_cont: ee.Image, lazy_hist: ee.Image) -> Tuple[ee.Image, ee.Image]:
     if region_uuid is not None:
         cont_key = cont_class_asset.format(region_uuid = region_uuid)
         hist_key = hist_class_asset.format(region_uuid = region_uuid)
@@ -37,15 +37,15 @@ def check_for_classified_imagery(uid: str, region_uuid: str, region: ee.Geometry
         hist_asset_id = asset_name(uid, hist_key)
         if asset_exists(cont_asset_id) and asset_exists(hist_asset_id):
             return ee.Image(cont_asset_id), ee.Image(hist_asset_id)
-        else:
+        elif make:
             make_image_assets(uid, [lazy_cont, lazy_hist], [cont_key, hist_key], region, False)
      
     return lazy_cont, lazy_hist
 
-def classification_export(uid: str, region_uuid: str, vis: bool, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int):
+def classification_export(uid: str, region_uuid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int):
     try:
-        cont_class, hist_class, coast, _ = combined_classification_lazy(uid, vis, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)
-        cont_class, hist_class = check_for_classified_imagery(uid, region_uuid, coast, cont_class, hist_class)
+        cont_class, hist_class, coast, _ = combined_classification_lazy(uid, True, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)
+        cont_class, hist_class = check_for_classified_imagery(uid, region_uuid, coast, False, cont_class, hist_class)
         
         cont_task = make_export(uid, cont_class, coast, "contemporary_classification")
         hist_task = make_export(uid, hist_class, coast, "historical_classification")
