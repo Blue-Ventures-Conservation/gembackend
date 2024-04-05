@@ -4,7 +4,7 @@ import time
 from typing import List, Tuple, Dict, Any
 
 from project import tile_timeout
-from roi import coastline, cont_imagery, hist_imagery, known_mangroves
+from roi import coastline, cont_imagery_collection, hist_imagery_collection, mosaic_indices, known_mangroves
 from assets import MissingAsset, make_export, make_image_assets, asset_name, asset_exists, asset_error, training_poly, asset_dl_timeout
 
 trees = 1000
@@ -13,6 +13,7 @@ leafpop = 1
 bag = 0.75
 nodes = None
 seeds = 0
+default_min_avg = 0.5
 
 cont_class_asset = "cont_class_{region_uuid}"
 hist_class_asset = "hist_class_{region_uuid}"
@@ -90,9 +91,16 @@ def combined_classification_lazy(uid: str, vis: bool, cont_key: str, hist_key: s
 def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry, ee.Geometry, ee.Geometry, ee.List]:
     coast = coastline(roi["polygon"])
     coast = coast.buffer(buff_dist)
-    chot, clot = cont_imagery(roi, buff_dist)
-    hhot, hlot = hist_imagery(roi, buff_dist)
-    fmask = final_mask(coast, clot, hlot)
+    conts, buffered_roi, indices = cont_imagery_collection(roi, buff_dist)
+    cont_water = ee.ImageCollection(conts).filter(ee.Filter.gte('MNDWI', default_min_avg)).qualityMosaic('inv_MNDWI').clip(buffered_roi)
+
+    hists, _, _ = hist_imagery_collection(roi, buff_dist)
+    hist_water = ee.ImageCollection(hists).filter(ee.Filter.gte('MNDWI', default_min_avg)).qualityMosaic('inv_MNDWI').clip(buffered_roi)
+
+    fmask = final_mask(coast, cont_water, hist_water)
+
+    chot, clot = mosaic_indices(conts, buffered_roi, indices)
+    hhot, hlot = mosaic_indices(hists, buffered_roi, indices)
     chot = chot.updateMask(fmask)
     clot = clot.updateMask(fmask)
     hhot = hhot.updateMask(fmask)
@@ -236,7 +244,7 @@ def topo_mask(dsm: ee.Image, mangs: ee.Image) -> ee.Image:
     return dsm.select('elev').lte(el_val).And(dsm.select('slope').lte(slp_val)).double()
 
 def renamed_mndwi(img: ee.Image) -> ee.Image:
-    return img.expression('(B2 - B5)/(B2 + B5)', {'B2': img.select('Green'), 'B5': img.select('Shortwave IR 1')}).rename(['MNDWI'])
+    return img.expression('(B2 - B5)/(B2 + B5)', {'B2': img.select('B2'), 'B5': img.select('B5')}).rename(['MNDWI'])
 
 def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, char_label: str) -> ee.FeatureCollection:
     props = [num_label, char_label]

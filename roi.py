@@ -11,7 +11,6 @@ buffers = {
 default_indices = ["CMRI", "MMRI", "MNDWI", "SAVI"]
 cloud_cover_limit = 15
 tidal_zone = 1000
-default_min_avg = 0.75
 ls4_dataset = "LANDSAT/LT04/C02/T1_L2"
 ls5_dataset = "LANDSAT/LT05/C02/T1_L2"
 ls7_dataset = "LANDSAT/LE07/C02/T1_L2"
@@ -151,32 +150,38 @@ def visualize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
         "timeout": tile_timeout
     }
 
-def chot_imagery(roi: dict, buff_dist: int) -> ee.ImageCollection:
+def chot_imagery(roi: dict, buff_dist: int) -> ee.Image:
     chot, _ = cont_imagery(roi, buff_dist)
     return chot
 
-def clot_imagery(roi: dict, buff_dist: int) -> ee.ImageCollection:
+def clot_imagery(roi: dict, buff_dist: int) -> ee.Image:
     _, clot = cont_imagery(roi, buff_dist)
     return clot
 
-def hhot_imagery(roi: dict, buff_dist: int) -> ee.ImageCollection:
+def hhot_imagery(roi: dict, buff_dist: int) -> ee.Image:
     hhot, _ = hist_imagery(roi, buff_dist)
     return hhot
 
-def hlot_imagery(roi: dict, buff_dist: int) -> ee.ImageCollection:
+def hlot_imagery(roi: dict, buff_dist: int) -> ee.Image:
     _, hlot = hist_imagery(roi, buff_dist)
     return hlot
 
-def cont_imagery(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
-    return get_imagery(buff_dist, roi.get("indices", default_indices), roi["polygon"], roi.get("excludes", []), roi["cont_year_start"], roi["cont_year_end"], roi["cont_month_start"], roi["cont_month_end"], roi.get("min_avg", default_min_avg))
+def cont_imagery(roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image]:
+    return get_imagery(buff_dist, roi.get("indices", default_indices), roi["polygon"], roi.get("excludes", []), roi["cont_year_start"], roi["cont_year_end"], roi["cont_month_start"], roi["cont_month_end"])
     
-def hist_imagery(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
-    return get_imagery(buff_dist, roi.get("indices", default_indices), roi["polygon"], roi.get("excludes", []), roi["hist_year_start"], roi["hist_year_end"], roi["hist_month_start"], roi["hist_month_end"], roi.get("min_avg", default_min_avg))
+def hist_imagery(roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image]:
+    return get_imagery(buff_dist, roi.get("indices", default_indices), roi["polygon"], roi.get("excludes", []), roi["hist_year_start"], roi["hist_year_end"], roi["hist_month_start"], roi["hist_month_end"])
+
+def cont_imagery_collection(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.Geometry, List[str]]:
+    return get_imagery_collection(buff_dist, roi.get("indices", default_indices), roi["polygon"], roi.get("excludes", []), roi["cont_year_start"], roi["cont_year_end"], roi["cont_month_start"], roi["cont_month_end"])
+
+def hist_imagery_collection(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.Geometry, List[str]]:
+    return get_imagery_collection(buff_dist, roi.get("indices", default_indices), roi["polygon"], roi.get("excludes", []), roi["hist_year_start"], roi["hist_year_end"], roi["hist_month_start"], roi["hist_month_end"])
     
 class NoImages(Exception):
     pass
 
-def get_imagery(buff_dist: int, indices: List[str], poly: dict, excludes: List[dict], year1: int, year2: int, month1: int, month2: int, min_avg: float = -1.0) -> Tuple[ee.ImageCollection, ee.ImageCollection]:
+def get_imagery_collection(buff_dist: int, indices: List[str], poly: dict, excludes: List[dict], year1: int, year2: int, month1: int, month2: int) -> Tuple[ee.ImageCollection, ee.Geometry, List[str]]:
     roi = ee.Geometry(poly)
     coast = coastline(roi)
     buffered_roi_poly = coast.buffer(buff_dist).intersection(roi)
@@ -205,13 +210,20 @@ def get_imagery(buff_dist: int, indices: List[str], poly: dict, excludes: List[d
         raise NoImages()
     
     imgs = imgs.map(apply_scale_factors).map(fix_float).map(doubleOO).map(cloud_mask)
-    imgs = tide_bands(shore_refl(imgs, zone, buffered_roi_poly, min_avg))
+    imgs = tide_bands(shore_refl(imgs, zone, buffered_roi_poly))
     
     for exclude in excludes:
         buffered_roi_poly = buffered_roi_poly.difference(exclude)
     
-    high_tide = ee.ImageCollection(imgs).qualityMosaic("MNDWI").select(['B1','B2','B3','B4','B5','B6','B7']).clip(buffered_roi_poly)
-    low_tide = ee.ImageCollection(imgs).qualityMosaic("inv_MNDWI").select(['B1','B2','B3','B4','B5','B6','B7']).clip(buffered_roi_poly)
+    return imgs, buffered_roi_poly, indices
+ 
+def get_imagery(buff_dist: int, indices: List[str], poly: dict, excludes: List[dict], year1: int, year2: int, month1: int, month2: int) -> Tuple[ee.Image, ee.Image]:
+    imgs, buffered_roi_poly, indices = get_imagery_collection(buff_dist, indices, poly, excludes, year1, year2, month1, month2)
+    return mosaic_indices(imgs, buffered_roi_poly, indices)
+ 
+def mosaic_indices(imgs: ee.ImageCollection, buffered_roi: ee.Geometry, indices: List[str]) -> Tuple[ee.Image, ee.Image]:
+    high_tide = ee.ImageCollection(imgs).qualityMosaic("MNDWI").select(['B1','B2','B3','B4','B5','B6','B7']).clip(buffered_roi)
+    low_tide = ee.ImageCollection(imgs).qualityMosaic("inv_MNDWI").select(['B1','B2','B3','B4','B5','B6','B7']).clip(buffered_roi)
     
     known_indices = []
     
@@ -293,7 +305,7 @@ def cloud_mask(img: ee.Image) -> ee.Image:
     opened = mask.focalMin(kernel = kernel, iterations = 1)
     return img.updateMask(opened)
 
-def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry, min_avg: float = -1.0) -> ee.ImageCollection:
+def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry) -> ee.ImageCollection:
     # import the PLASAT dataset and create an land mask
     land_mask = ee.ImageCollection('JAXA/ALOS/PALSAR/YEARLY/SAR') \
             .filter(ee.Filter.date('2017-01-01', '2018-01-01')) \
@@ -321,10 +333,7 @@ def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry, m
     
     m = ee.ImageCollection(imgs).map(mndwi_map)
     
-    if m.filter(ee.Filter.gte("MNDWI", min_avg)).size().getInfo() == 0:
-        min_avg = 0.5
-    
-    return m.filter(ee.Filter.gte("MNDWI", min_avg))
+    return m.filter(ee.Filter.gte("MNDWI", -1.0))
 
 def tide_bands(imgs: ee.ImageCollection) -> ee.ImageCollection:
     # add a band to each image called MNDWI (created from the shoreRefl function)
