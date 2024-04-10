@@ -2,7 +2,7 @@ import ee
 from typing import Dict, List, Tuple
 
 from enum import Enum
-from roi import chot_imagery, clot_imagery, hhot_imagery, hlot_imagery
+from imagery import chot_imagery, clot_imagery, hhot_imagery, hlot_imagery
 from classification import sample_image, ordered_classes
 from assets import asset_error, training_poly
 

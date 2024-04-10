@@ -1,15 +1,15 @@
 {
-  "visualize":true,
   "buff_dist":2500,
+  "force_landsat": false,
   "name":"my_roi",
-  "cont_year_start":2019,
-  "cont_year_end":2021,
+  "cont_year_start":2022,
+  "cont_year_end":2023,
   "cont_month_start":6,
   "cont_month_end":8,
-  "hist_year_start":1998,
-  "hist_year_end":2001,
-  "hist_month_start":5,
-  "hist_month_end":9,
+  "hist_year_start":2019,
+  "hist_year_end":2020,
+  "hist_month_start":6,
+  "hist_month_end":8,
   "excludes": [{
     "type": "Polygon",
     "coordinates":[

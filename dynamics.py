@@ -9,8 +9,8 @@ from assets import asset_error, make_export, make_table_export, asset_dl_timeout
 
 def dynamics_ready(uid: str, region_uuid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int, prev_cont_op: str, prev_hist_op: str):
     try:
-        cont_lazy, hist_lazy, region, _, _ = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
-        cont, hist, cont_op, hist_op = get_cached_imagery_or_submit(uid, region_uuid, region, prev_cont_op, prev_hist_op, cont_lazy, hist_lazy)
+        cont_lazy, hist_lazy, region, _, _, scale = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
+        cont, hist, cont_op, hist_op = get_cached_imagery_or_submit(uid, region_uuid, region, prev_cont_op, prev_hist_op, cont_lazy, hist_lazy, scale)
         
         return {
             "cont_ready": cont is not None,
@@ -23,7 +23,7 @@ def dynamics_ready(uid: str, region_uuid: str, cont_key: str, hist_key: str, use
 
 def dynamics_export(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, sub_regions: List[dict], red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
     try:
-        class_num, _, cont_class, hist_class, region, sortedValues, sortedNames = combine_classes(uid,region_uuid, target_classes, combined_name, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
+        class_num, _, cont_class, hist_class, region, sortedValues, sortedNames, scale = combine_classes(uid,region_uuid, target_classes, combined_name, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
         classImgs = class_images(cont_class, hist_class, sortedValues)
         
         roi_stats, selectors = region_csv_stats(roi["name"], region, class_num, classImgs, sortedValues, sortedNames)
@@ -33,14 +33,14 @@ def dynamics_export(uid: str, region_uuid: str, target_classes: List[str], combi
         
         csvTask = make_table_export(uid, ee.FeatureCollection(roi_stats), selectors, "dynamics_hectares")
         
-        _, lmask, pmask, gmask = region_stats(True, region, class_num, classImgs, sortedValues, sortedNames)
+        _, lmask, pmask, gmask = region_stats(True, region, class_num, classImgs, sortedValues, sortedNames, scale)
         
         lmask = lmask.visualize(palette = red)
         pmask = pmask.visualize(palette = green)
         gmask = gmask.visualize(palette = blue)
-        ltask = make_export(uid, lmask, region, "loss")
-        ptask = make_export(uid, pmask, region, "persistence")
-        gtask = make_export(uid, gmask, region, "gain")
+        ltask = make_export(uid, lmask, region, "loss", scale)
+        ptask = make_export(uid, pmask, region, "persistence", scale)
+        gtask = make_export(uid, gmask, region, "gain", scale)
         
         return {
             "loss": ltask,
@@ -55,9 +55,9 @@ def dynamics_export(uid: str, region_uuid: str, target_classes: List[str], combi
 
 def get_dynamics(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, sub_regions: List[dict], red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
     try:
-        class_num, tpos, cont_class, hist_class, roi_geo, sortedValues, sortedNames = combine_classes(uid, region_uuid, target_classes, combined_name, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
+        class_num, tpos, cont_class, hist_class, roi_geo, sortedValues, sortedNames, scale = combine_classes(uid, region_uuid, target_classes, combined_name, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
         classImgs = class_images(cont_class, hist_class, sortedValues)
-        rstats, lmask, pmask, gmask  = region_stats(False, roi_geo, class_num, classImgs, sortedValues, sortedNames)
+        rstats, lmask, pmask, gmask  = region_stats(False, roi_geo, class_num, classImgs, sortedValues, sortedNames, scale)
         
         output = {
             "name": roi["name"],
@@ -79,7 +79,7 @@ def get_dynamics(uid: str, region_uuid: str, target_classes: List[str], combined
         }
         
         for sr in sub_regions:
-            stats, _, _, _ = region_stats(False, ee.Geometry(sr["geometry"]), class_num, classImgs, sortedValues, sortedNames)
+            stats, _, _, _ = region_stats(False, ee.Geometry(sr["geometry"]), class_num, classImgs, sortedValues, sortedNames, scale)
             output["sub_region_stats"].append({"name": sr["name"], "contemporary_area": stats[tpos]["cont"], "historical_area": stats[tpos]["hist"], "loss": stats[tpos]["loss"], "persistence": stats[tpos]["persistence"], "gain": stats[tpos]["gain"], "all_classes": stats})
         
         return output
@@ -96,12 +96,12 @@ def class_images(cont_class: ee.Image, hist_class: ee.Image, sortedValues: List[
     return classImgs
 
 def combine_classes(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Tuple[int, int, ee.Dictionary, ee.Image, ee.Image, ee.Geometry, List[int], List[str]]:
-    cont_class, hist_class, region, _, sorts = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
-    cont_class, hist_class, _, _ = get_cached_imagery_or_submit(uid, region_uuid, region, None, None, cont_class, hist_class)
+    cont_class, hist_class, region, _, sorts, scale = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
+    cont_class, hist_class, _, _ = get_cached_imagery_or_submit(uid, region_uuid, region, None, None, cont_class, hist_class, scale)
     
     if cont_class is None or hist_class is None:
         raise Exception("classification cache unavailable")
-
+    
     sortedValues = sorts[0]
     sortedNames = sorts[1]
     
@@ -135,9 +135,9 @@ def combine_classes(uid: str, region_uuid: str, target_classes: List[str], combi
         cont_class = cont_class.multiply(cont_neg).add(cont_combo)
         hist_class = hist_class.multiply(hist_neg).add(hist_combo)
      
-    return class_num, sortedValues.index(class_num), cont_class, hist_class, region, sortedValues, sortedNames
+    return class_num, sortedValues.index(class_num), cont_class, hist_class, region, sortedValues, sortedNames, scale
 
-def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: ee.Dictionary, sortedValues: List[int], sortedNames: List[str]) -> Tuple[List[dict], ee.Image, ee.Image, ee.Image]:
+def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: ee.Dictionary, sortedValues: List[int], sortedNames: List[str], scale: int) -> Tuple[List[dict], ee.Image, ee.Image, ee.Image]:
     def contHist(pos):
         cimgs = ee.Dictionary(classImgs.get(pos))
         cont = ee.Image(cimgs.get("cont"))
@@ -167,21 +167,21 @@ def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: e
             
             to = to.add(ee.Dictionary({
                 "name": lab,
-                "area": maskArea(cont.And(hc).selfMask(), geo)
+                "area": maskArea(cont.And(hc).selfMask(), geo, scale)
             }))
             frm = frm.add(ee.Dictionary({
                 "name": lab,
-                "area": maskArea(hist.And(cc).selfMask(), geo)
+                "area": maskArea(hist.And(cc).selfMask(), geo, scale)
             }))
         
-        contArea = maskArea(cont.selfMask(), geo)
-        histArea = maskArea(hist.selfMask(), geo)
+        contArea = maskArea(cont.selfMask(), geo, scale)
+        histArea = maskArea(hist.selfMask(), geo, scale)
         lossMask = hist.subtract(cont).eq(1).selfMask()
-        lossArea = maskArea(lossMask, geo)
+        lossArea = maskArea(lossMask, geo, scale)
         perMask = hist.And(cont).selfMask()
-        perArea = maskArea(perMask, geo)
+        perArea = maskArea(perMask, geo, scale)
         gainMask = cont.subtract(hist).eq(1).selfMask()
-        gainArea = maskArea(gainMask, geo)
+        gainArea = maskArea(gainMask, geo, scale)
         
         if class_num == num:
             tloss = lossMask
@@ -217,11 +217,11 @@ def lpg_url(mask: ee.Image, color: str) -> str:
     vis = {"palette": color}
     return mask.getMapId(vis)["tile_fetcher"].url_format
 
-def maskArea(mask: ee.Image, geo: ee.Geometry) -> ee.Number:
+def maskArea(mask: ee.Image, geo: ee.Geometry, scale: int) -> ee.Number:
     return ee.Number(ee.Image.pixelArea().updateMask(mask).reduceRegion(
             reducer = ee.Reducer.sum(),
             geometry = geo,
-            scale = 30,
+            scale = scale,
             maxPixels = 1e13,
             bestEffort = True,
     ).get("area")).round()

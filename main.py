@@ -11,6 +11,7 @@ import google.auth
 import project
 from access import *
 from roi import *
+from imagery import *
 from assets import *
 from classification import *
 from separability import *
@@ -99,9 +100,21 @@ def area_chart_route():
 def ls_imagery_route():
     try:
         content = request.json
+        content["force_landsat"] = True
         visuals = visualize_imagery(content, content["buff_dist"])
     except Exception as e:
         return "", error_check("/ls_imagery", content, e)
+    
+    return jsonify(visuals)
+
+@app.route("/get_imagery", methods=["POST"])
+@token_check
+def get_imagery_route():
+    try:
+        content = request.json
+        visuals = visualize_imagery(content, content["buff_dist"])
+    except Exception as e:
+        return "", error_check("/get_imagery", content, e)
     
     return jsonify(visuals)
 
@@ -110,9 +123,21 @@ def ls_imagery_route():
 def export_ls_imagery(uid: str):
     try:
         content = request.json
-        data = ls_imagery_export(uid, content["visualize"], content, content["buff_dist"])
+        content["force_landsat"] = True
+        data = imagery_export(uid, content["visualize"], content, content["buff_dist"])
     except Exception as e:
         return "", error_check("/export_roi_imagery", content, e)
+    
+    return jsonify(data)
+
+@app.route("/export_imagery", methods=["POST"])
+@token_check
+def export_imagery(uid: str):
+    try:
+        content = request.json
+        data = imagery_export(uid, content["visualize"], content, content["buff_dist"])
+    except Exception as e:
+        return "", error_check("/export_imagery", content, e)
     
     return jsonify(data)
 
