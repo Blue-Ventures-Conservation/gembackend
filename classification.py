@@ -128,8 +128,8 @@ def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_con
 
     fmask = final_mask(buf_excl_roi, cont_water, hist_water)
 
-    chot, clot = mosaic_indices(conts, buf_excl_roi, indices, scale)
-    hhot, hlot = mosaic_indices(hists, buf_excl_roi, indices, scale)
+    chot, clot, _ = mosaic_indices(conts, buf_excl_roi, indices, scale)
+    hhot, hlot, _ = mosaic_indices(hists, buf_excl_roi, indices, scale)
     chot = chot.updateMask(fmask)
     clot = clot.updateMask(fmask)
     hhot = hhot.updateMask(fmask)
@@ -229,10 +229,11 @@ def classify_fully(uid: str, region_uuid: str, asset_fmt: str, region: ee.Geomet
         "image_op": image_op,
     }, classes
 
-def final_mask(coast: ee.Geometry, clot: ee.Image, hlot: ee.Image) -> ee.Image:
+dsm_scale = 30
+
+def final_mask(region: ee.Geometry, clot: ee.Image, hlot: ee.Image) -> ee.Image:
     mangs = known_mangroves().clip(region)
-    dsm = topo_dsm()
-    tmask = topo_mask(dsm, 30, mangs)
+    tmask = topo_mask(topo_dsm(), dsm_scale, mangs)
     
     mndwi_cont = produce_mndwi(clot).lt(0.09)
     ndwi_cont = produce_ndwi(clot).lt(0.20)
@@ -246,7 +247,7 @@ def final_mask(coast: ee.Geometry, clot: ee.Image, hlot: ee.Image) -> ee.Image:
     
     return h2o_mask.multiply(tmask).eq(1)
 
-def topo_dsm() -> Tuple[ee.Image, int]:
+def topo_dsm() -> ee.Image:
     elev = ee.ImageCollection("JAXA/ALOS/AW3D30/V3_2").select("DSM")
     proj = elev.first().select(0).projection()
     dsm = elev.mosaic().setDefaultProjection(proj).rename("elev")
