@@ -286,12 +286,24 @@ def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, ch
         except:
             pass
     
-    return img.sampleRegions(
+    # Call getInfo here to produce the samples and avoid so many concurrent aggregations later.
+    # This slows the overall time to respond, but allows sentinel2 classificaiton to succeed.
+    # It may be nice at some point to remove this for Landsat requests.
+    # A longer-term solution for sentinel2, if we continue to encounter too may concurrent aggregations,
+    # would be to force the user to wait on the client for an export
+    sample = img.sampleRegions(
         collection = t_poly,
         properties = props,
         scale = scale,
-        tileScale = 16
-    )
+        geometries = True,
+    ).getInfo()
+    
+    # remove geodesic which is unrecognozed by the API for some reason
+    for feat in sample.get("features", []):
+        geom = feat.get("geometry", {})
+        geom.pop("geodesic", None)
+    
+    return ee.FeatureCollection(sample)
 
 def ordered_classes(zipped: list) -> List[str]:
     ordered = []

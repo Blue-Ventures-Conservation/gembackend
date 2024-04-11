@@ -359,7 +359,6 @@ def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry) -
             scale = 100,
             maxPixels = 1e15,
             bestEffort = True,
-            tileScale = 16
         ).get('MNDWI')
         
         # input that value into the image metadata as the property 'MNDWI'
