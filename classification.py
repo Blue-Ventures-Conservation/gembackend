@@ -301,7 +301,7 @@ def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, ch
     
     ts = 16
     if scale < 30:
-        ts = 1
+        ts = 2
     
     sample = img.sampleRegions(
         collection = t_poly,
@@ -312,9 +312,11 @@ def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, ch
     ).getInfo()
     
     # remove geodesic which is unrecognozed by the API for some reason
+    # remove id because it's not needed
     for feat in sample.get("features", []):
         geom = feat.get("geometry", {})
         geom.pop("geodesic", None)
+        geom.pop("id", None)
     
     return ee.FeatureCollection(sample)
 

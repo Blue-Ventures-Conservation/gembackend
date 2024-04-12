@@ -150,7 +150,6 @@ def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: e
     tpers = None
     tgain = None
     fetched = []
-    toFetch = []
     
     # loop through classes and get all stats for each
     for p1, num in enumerate(sortedValues):
@@ -176,6 +175,9 @@ def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: e
                 "area": maskArea(hist.And(cc).selfMask(), geo, scale)
             }))
         
+        to = to.getInfo()
+        frm = frm.getInfo()
+        
         contArea = maskArea(cont.selfMask(), geo, scale)
         histArea = maskArea(hist.selfMask(), geo, scale)
         lossMask = hist.subtract(cont).eq(1).selfMask()
@@ -193,11 +195,11 @@ def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: e
         if not masksOnly:
             data = {
                 "name": label,
+                "cont": contArea,
+                "hist": histArea,
                 "loss": lossArea,
                 "persistence": perArea,
                 "gain": gainArea,
-                "hist": histArea,
-                "cont": contArea,
                 "conversions": {
                     "to": to,
                     "from": frm,
@@ -222,7 +224,7 @@ def lpg_url(mask: ee.Image, color: str) -> str:
 def maskArea(mask: ee.Image, geo: ee.Geometry, scale: int) -> ee.Number:
     ts = 16
     if scale < 30:
-        ts = 1
+        ts = 2
     
     return ee.Number(ee.Image.pixelArea().updateMask(mask).reduceRegion(
             reducer = ee.Reducer.sum(),
