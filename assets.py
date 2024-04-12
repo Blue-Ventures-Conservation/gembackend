@@ -12,6 +12,7 @@ asset_user_shps = 'gs://{bucket}/users/{uid}/shps/{key}.zip'
 asset_user_downloads = 'users/{uid}/downloads/{name}_{slug}'
 # 47 hours x 60 min x 60 min
 asset_dl_timeout = 47 * 60 * 60
+asset_max_pixels = 1e13
 
 class MissingAsset(Exception):
     pass
@@ -26,7 +27,7 @@ def make_export(uid: str, img: ee.Image, region: ee.Geometry, name: str, scale: 
         image = img,
         region = region,
         scale = scale,
-        maxPixels = 1e13,
+        maxPixels = asset_max_pixels,
     )
     task.start()
     
@@ -68,7 +69,7 @@ def make_image_assets(uid: str, imgs: List[ee.Image], keys: List[str], region: e
             assetId = asset_id,
             region = region,
             scale = scale,
-            maxPixels = 1e13,
+            maxPixels = asset_max_pixels,
         )
         task.start()
         ops.append(task.status()['name'])

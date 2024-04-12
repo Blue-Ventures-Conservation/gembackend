@@ -3,7 +3,7 @@ import time
 
 from typing import Dict, List, Tuple
 
-from project import tile_timeout
+from project import tile_timeout, aggregation_max_pixels
 from classification import get_cached_imagery_or_submit, combined_classification_lazy
 from assets import asset_error, make_export, make_table_export, asset_dl_timeout
 
@@ -137,6 +137,8 @@ def combine_classes(uid: str, region_uuid: str, target_classes: List[str], combi
      
     return class_num, sortedValues.index(class_num), cont_class, hist_class, region, sortedValues, sortedNames, scale
 
+max_concurrent_stats = 1
+
 def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: ee.Dictionary, sortedValues: List[int], sortedNames: List[str], scale: int) -> Tuple[List[dict], ee.Image, ee.Image, ee.Image]:
     def contHist(pos):
         cimgs = ee.Dictionary(classImgs.get(pos))
@@ -218,12 +220,17 @@ def lpg_url(mask: ee.Image, color: str) -> str:
     return mask.getMapId(vis)["tile_fetcher"].url_format
 
 def maskArea(mask: ee.Image, geo: ee.Geometry, scale: int) -> ee.Number:
+    ts = 16
+    if scale < 30:
+        ts = 1
+    
     return ee.Number(ee.Image.pixelArea().updateMask(mask).reduceRegion(
             reducer = ee.Reducer.sum(),
             geometry = geo,
-            scale = scale,
-            maxPixels = 1e13,
+            scale = 100,
+            maxPixels = aggregation_max_pixels,
             bestEffort = True,
+            tileScale = ts,
     ).get("area")).round()
 
 def region_csv_stats(region_name: str, geo: ee.Geometry, class_num: int, classImgs: ee.Dictionary, sortedValues: List[int], sortedNames: List[str]) -> Tuple[List[ee.Feature], List[str]]:

@@ -8,6 +8,7 @@ buffers = {
     '15 km': 15000, '17.5 km': 17500, '20 km': 20000, '22.5 km': 22500, '25 km': 25000
 }
 mangroves_scale = 30
+mangroves_max_pixels = 1e13
 
 def known_mangroves() -> ee.Image:
     giri = ee.ImageCollection("LANDSAT/MANGROVE_FORESTS").mean()
@@ -63,7 +64,7 @@ def area_chart(poly: dict, excludes: List[dict]) -> Dict[str, dict]:
         reducer = ee.Reducer.sum(),
         geometry = roi,
         scale = mangroves_scale,
-        maxPixels = 1e13,
+        maxPixels = mangroves_max_pixels,
         bestEffort = True
     ).getInfo()
     

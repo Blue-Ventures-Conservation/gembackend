@@ -3,8 +3,13 @@ import time
 
 from typing import List, Tuple, Dict, Any
 
+<<<<<<< HEAD
 from project import tile_timeout
 from roi import known_mangroves
+=======
+from project import tile_timeout, aggregation_max_pixels
+from roi import coastline, known_mangroves
+>>>>>>> f183132 (some vars for max pixels, adjust tileScale based on image scale, coarsen area calculation)
 from imagery import cont_imagery_collection, hist_imagery_collection, mosaic_indices, produce_mndwi, produce_ndwi
 from assets import MissingAsset, make_export, make_image_assets, asset_name, asset_exists, check_operation, asset_error, training_poly, asset_dl_timeout
 
@@ -18,6 +23,8 @@ default_min_avg = 0.5
 
 cont_class_asset = "cont_class_{region_uuid}"
 hist_class_asset = "hist_class_{region_uuid}"
+
+topo_max_pixels = 1e12
 
 class ClassifierFailed(Exception):
     pass
@@ -259,7 +266,7 @@ def topo_mask(dsm: ee.Image, scale: int, mangs: ee.Image) -> ee.Image:
             reducer = ee.Reducer.percentile(percentiles = [99]),
             geometry = mangs.geometry(),
             scale = scale,
-            maxPixels = 1e12,
+            maxPixels = topo_max_pixels,
             bestEffort = True
     )
     
@@ -267,7 +274,7 @@ def topo_mask(dsm: ee.Image, scale: int, mangs: ee.Image) -> ee.Image:
             reducer = ee.Reducer.percentile(percentiles = [99]),
             geometry = mangs.geometry(),
             scale = scale,
-            maxPixels = 1e12,
+            maxPixels = topo_max_pixels,
             bestEffort = True
     )
     
@@ -291,10 +298,16 @@ def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, ch
     # It may be nice at some point to remove this for Landsat requests.
     # A longer-term solution for sentinel2, if we continue to encounter too may concurrent aggregations,
     # would be to force the user to wait on the client for an export
+    
+    ts = 16
+    if scale < 30:
+        ts = 1
+    
     sample = img.sampleRegions(
         collection = t_poly,
         properties = props,
         scale = scale,
+        tileScale = ts,
         geometries = True,
     ).getInfo()
     
