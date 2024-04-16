@@ -137,8 +137,6 @@ def combine_classes(uid: str, region_uuid: str, target_classes: List[str], combi
      
     return class_num, sortedValues.index(class_num), cont_class, hist_class, region, sortedValues, sortedNames, scale
 
-max_concurrent_stats = 1
-
 def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: ee.Dictionary, sortedValues: List[int], sortedNames: List[str], scale: int) -> Tuple[List[dict], ee.Image, ee.Image, ee.Image]:
     def contHist(pos):
         cimgs = ee.Dictionary(classImgs.get(pos))

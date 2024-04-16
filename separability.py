@@ -237,7 +237,7 @@ def correlation_cell(img: ee.Image, t_poly: ee.FeatureCollection) -> ee.Number:
         maxPixels = 1e13,
         geometry = t_poly,
         scale = 300,
-        tileScale = 2
+        tileScale = 2,
     ).get('correlation')
 
 def zipped_props(sample: ee.FeatureCollection, num_label: str, char_label: str) -> List[str]:

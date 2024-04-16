@@ -5,7 +5,7 @@ from project import tile_timeout
 from assets import make_export, asset_dl_timeout
 from roi import coastline
 
-default_cloud_limit = 100
+default_cloud_limit = 85  # percent
 default_tidal_zone = 1000 # meters
 default_indices = ["CMRI", "MMRI", "MNDWI", "SAVI"]
 # B4, B5, B3 false color composite
