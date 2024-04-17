@@ -13,7 +13,7 @@ leafpop = 1
 bag = 0.75
 nodes = None
 seeds = 0
-default_min_avg = 0.75
+default_min_avg = 0.5
 
 cont_class_asset = "cont_class_{region_uuid}"
 hist_class_asset = "hist_class_{region_uuid}"
