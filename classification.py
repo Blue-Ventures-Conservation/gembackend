@@ -13,7 +13,7 @@ leafpop = 1
 bag = 0.75
 nodes = None
 seeds = 0
-default_min_avg = 0.5
+default_min_avg = 0.75
 
 cont_class_asset = "cont_class_{region_uuid}"
 hist_class_asset = "hist_class_{region_uuid}"
@@ -210,7 +210,7 @@ def final_mask(coast: ee.Geometry, clot: ee.Image, hlot: ee.Image) -> ee.Image:
     
     mndwi_cont = renamed_mndwi(clot).lt(0.09)
     mndwi_hist = renamed_mndwi(hlot).lt(0.09)
-    h2o_mask = mndwi_cont.add(mndwi_hist).gt(1)
+    h2o_mask = mndwi_cont.add(mndwi_hist).gte(1)
     
     return h2o_mask.multiply(tmask).eq(1)
 
