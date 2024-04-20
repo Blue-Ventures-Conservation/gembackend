@@ -324,27 +324,43 @@ def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry) -
             maxPixels = 1e15,
             bestEffort = True,
             tileScale = 16
-        )
+        ).get('MNDWI')
         
-        # create single value to add to metadata
-        cum_sum = ee.List(cum_val.values()).reduce(ee.Reducer.sum())
         # input that value into the image metadata as the property 'MNDWI'
-        return img.set('MNDWI', ee.Number(cum_sum))
+        return img.set('MNDWI', ee.Number(cum_val))
     
-    m = ee.ImageCollection(imgs).map(mndwi_map)
+    def ndwi_map(img: ee.Image) -> ee.Image:
+        ndwi = produce_ndwi(img)
+        # use the MODIS land/water mask and cloud mask to mask out the land
+        masked_ndwi = ndwi.updateMask(land_mask)
+        # reduce the image to the buffered shoreline, calculating a NDWI
+        cum_val = masked_ndwi.reduceRegion(
+            reducer = ee.Reducer.mean(),
+            geometry = zone,
+            scale = 100,
+            maxPixels = 1e15,
+            bestEffort = True,
+            tileScale = 16
+        ).get('NDWI')
+        
+        # input that value into the image metadata as the property 'NDWI'
+        return img.set('NDWI', ee.Number(cum_val))
+    
+    
+    m = ee.ImageCollection(imgs).map(mndwi_map).map(ndwi_map)
     
     return m.filter(ee.Filter.gte("MNDWI", -1.0))
 
 def tide_bands(imgs: ee.ImageCollection) -> ee.ImageCollection:
     # add a band to each image called MNDWI (created from the shoreRefl function)
     def mndwi_band(img: ee.Image) -> ee.Image:
-        return img.addBands(img.metadata("MNDWI"))
+        return img.addBands(img.metadata("MNDWI")).addBands(img.metadata("NDWI"))
     # create an inverse MNDWI to be used for high-tide conditions
     def inv_mndwi(img: ee.Image) -> ee.Image:
-        return img.set("inv_MNDWI", ee.Number(img.get("MNDWI")).multiply(-1))
+        return img.set("inv_MNDWI", ee.Number(img.get("MNDWI")).multiply(-1)).set("inv_NDWI", ee.Number(img.get("NDWI")).multiply(-1))
     # create an inverse MNDWI band for high-tide conditions
     def inv_mndwi_band(img: ee.Image) -> ee.Image:
-        return img.addBands(img.metadata("inv_MNDWI"))
+        return img.addBands(img.metadata("inv_MNDWI")).addBands(img.metadata("inv_NDWI"))
     
     return imgs.map(mndwi_band).map(inv_mndwi).map(inv_mndwi_band)
 
@@ -371,6 +387,9 @@ def produce_ndvi(img: ee.Image) -> ee.Image:
 
 def produce_mndwi(img: ee.Image) -> ee.Image:
     return img.expression('(B2 - B5)/(B2 + B5)', {'B2': img.select('B2'), 'B5': img.select('B5')}).rename(['MNDWI'])
+
+def produce_ndwi(img: ee.Image) -> ee.Image:
+    return img.expression('(B2 - B4)/(B2 + B4)', {'B2': img.select('B2'), 'B4': img.select('B4')}).rename(['NDWI'])
 
 def produce_savi(img: ee.Image) -> ee.Image:
     return img.select('B4').subtract(img.select('B3')).divide(img.select('B4').add(img.select('B3')).add(0.5)).multiply(1.5).rename(['SAVI'])

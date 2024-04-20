@@ -4,7 +4,7 @@ import time
 from typing import List, Tuple, Dict, Any
 
 from project import tile_timeout
-from roi import coastline, cont_imagery_collection, hist_imagery_collection, mosaic_indices, known_mangroves
+from roi import coastline, cont_imagery_collection, hist_imagery_collection, mosaic_indices, known_mangroves, produce_mndwi, produce_ndwi
 from assets import MissingAsset, make_export, make_image_assets, asset_name, asset_exists, asset_error, training_poly, asset_dl_timeout
 
 trees = 1000
@@ -13,7 +13,7 @@ leafpop = 1
 bag = 0.75
 nodes = None
 seeds = 0
-default_min_avg = 0.75
+default_min_avg = 0.5
 
 cont_class_asset = "cont_class_{region_uuid}"
 hist_class_asset = "hist_class_{region_uuid}"
@@ -208,9 +208,15 @@ def final_mask(coast: ee.Geometry, clot: ee.Image, hlot: ee.Image) -> ee.Image:
     mangs = known_mangroves().clip(coast)
     tmask = topo_mask(topo_dsm(), mangs)
     
-    mndwi_cont = renamed_mndwi(clot).lt(0.09)
-    mndwi_hist = renamed_mndwi(hlot).lt(0.09)
-    h2o_mask = mndwi_cont.add(mndwi_hist).gte(1)
+    mndwi_cont = produce_mndwi(clot).lt(0.09)
+    ndwi_cont = produce_ndwi(clot).lt(0.20)
+    cont_water = mndwi_cont.add(ndwi_cont).gt(1)
+    
+    mndwi_hist = produce_mndwi(hlot).lt(0.09)
+    ndwi_hist = produce_ndwi(hlot).lt(0.20)
+    hist_water = mndwi_hist.add(ndwi_hist).gt(1)
+    
+    h2o_mask = cont_water.add(hist_water).gte(1)
     
     return h2o_mask.multiply(tmask).eq(1)
 
@@ -242,9 +248,6 @@ def topo_mask(dsm: ee.Image, mangs: ee.Image) -> ee.Image:
     slp_val = ee.Image.constant(mang_slope.get('slope'))
     
     return dsm.select('elev').lte(el_val).And(dsm.select('slope').lte(slp_val)).double()
-
-def renamed_mndwi(img: ee.Image) -> ee.Image:
-    return img.expression('(B2 - B5)/(B2 + B5)', {'B2': img.select('B2'), 'B5': img.select('B5')}).rename(['MNDWI'])
 
 def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, char_label: str) -> ee.FeatureCollection:
     props = [num_label, char_label]
