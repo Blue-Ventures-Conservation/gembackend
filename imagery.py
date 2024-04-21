@@ -341,13 +341,16 @@ def ls_cloud_mask(img: ee.Image) -> ee.Image:
     opened = mask.focalMin(kernel = kernel, iterations = 1)
     return img.updateMask(opened)
 
-def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry) -> ee.ImageCollection:
+def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry, scale: int) -> ee.ImageCollection:
     # import the PLASAT dataset and create an land mask
     land_mask = ee.ImageCollection('JAXA/ALOS/PALSAR/YEARLY/SAR') \
             .filter(ee.Filter.date('2017-01-01', '2018-01-01')) \
             .mosaic().clip(poly) \
             .select('qa').eq(50)
     
+    ts = 16
+    if scale < 30:
+        ts = 2
     def mndwi_map(img: ee.Image) -> ee.Image:
         mndwi = produce_mndwi(img)
         # use the MODIS land/water mask and cloud mask to mask out the land
@@ -359,6 +362,7 @@ def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry) -
             scale = 100,
             maxPixels = 1e15,
             bestEffort = True,
+            tileScale = ts,
         ).get('MNDWI')
         
         # input that value into the image metadata as the property 'MNDWI'
@@ -375,7 +379,7 @@ def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry) -
             scale = 100,
             maxPixels = 1e15,
             bestEffort = True,
-            tileScale = 16
+            tileScale = ts,
         ).get('NDWI')
         
         # input that value into the image metadata as the property 'NDWI'
@@ -384,7 +388,7 @@ def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry) -
     
     m = ee.ImageCollection(imgs).map(mndwi_map).map(ndwi_map)
     
-    return m.filter(ee.Filter.gte("MNDWI", -1.0))
+    return tide_bands(m.filter(ee.Filter.gte("MNDWI", -1.0)))
 
 def tide_bands(imgs: ee.ImageCollection) -> ee.ImageCollection:
     # add a band to each image called MNDWI (created from the shoreRefl function)
