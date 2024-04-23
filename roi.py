@@ -59,7 +59,9 @@ def ls_imagery_export(uid: str, vis: bool, roi: dict, buff_dist: int):
     }
 
 def known_mangroves() -> ee.Image:
-    return ee.ImageCollection("LANDSAT/MANGROVE_FORESTS").reduce(ee.Reducer.mean())
+    giri = ee.ImageCollection("LANDSAT/MANGROVE_FORESTS").mean()
+    gmw = ee.Image("projects/earthengine-legacy/assets/projects/sat-io/open-datasets/GMW/union/gmw_v3_mng_union")
+    return giri.blend(gmw)
 
 def buffered_coastline(roi_poly: ee.Geometry, buff_dist: int) -> ee.Geometry:
     coast = coastline(roi_poly)
