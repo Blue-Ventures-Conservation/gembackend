@@ -8,7 +8,7 @@ buffers = {
     '1 km': 1000, '2.5 km': 2500, '5 km': 5000, '7.5 km': 7500, '10 km': 10000, '12.5 km': 12500,
     '15 km': 15000, '17.5 km': 17500, '20 km': 20000, '22.5 km': 22500, '25 km': 25000
 }
-default_indices = ["MMRI", "MNDWI", "SAVI"]
+default_indices = ["CMRI", "MMRI", "MNDWI", "SAVI"]
 cloud_cover_limit = 15
 tidal_zone = 1000
 ls4_dataset = "LANDSAT/LT04/C02/T1_L2"
