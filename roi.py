@@ -191,7 +191,7 @@ def get_imagery_collection(buff_dist: int, indices: List[str], poly: dict, exclu
     
     ls4 = ls4_imagery(buffered_roi_poly, year1, year2, month1, month2)
     ls5 = ls5_imagery(buffered_roi_poly, year1, year2, month1, month2)
-    # ls7 = ls7_imagery(buffered_roi_poly, year1, year2, month1, month2)
+    ls7 = ls7_imagery(buffered_roi_poly, year1, year2, month1, month2)
     ls8 = ls8_imagery(buffered_roi_poly, year1, year2, month1, month2)
     ls9 = ls9_imagery(buffered_roi_poly, year1, year2, month1, month2)
     
@@ -200,7 +200,7 @@ def get_imagery_collection(buff_dist: int, indices: List[str], poly: dict, exclu
             .select(['SR_B2','SR_B3','SR_B4','SR_B5','SR_B6','SR_B7','ST_B10','QA_PIXEL'], ['B1','B2','B3','B4','B5','B7','B6','pixel_qa'])
     
     # merge TM/ETM+ the collection
-    tm_imgs = ee.ImageCollection(ls5.merge(ls4)) \
+    tm_imgs = ee.ImageCollection(ls7.merge(ls5.merge(ls4))) \
             .select(['SR_B1','SR_B2','SR_B3','SR_B4','SR_B5','SR_B7','ST_B6','QA_PIXEL'], ['B1','B2','B3','B4','B5','B7','B6','pixel_qa'])
     
     tm_imgs = tm_imgs.map(etm_to_oli)
@@ -262,7 +262,36 @@ def ls5_imagery(poly: ee.Geometry, year1: int, year2: int, month1: int, month2: 
     return filtered_ls(ls5_dataset, poly, year1, year2, month1, month2)
 
 def ls7_imagery(poly: ee.Geometry, year1: int, year2: int, month1: int, month2: int) -> ee.ImageCollection:
-    return filtered_ls(ls7_dataset, poly, year1, year2, month1, month2)
+    justMay = month1 == 5 and month2 == 5
+    normal = month1 < month2
+    wrapping = month1 > month2
+    monthRangeOverlaps = (wrapping and month1 <= 5) or (wrapping and month2 >= 5) or (normal and (month1 <= 5))
+    monthsOverlap = justMay or monthRangeOverlaps
+    overlaps = year1 < 2003 or (year1 == 2003 and monthsOverlap)
+    if not overlaps:
+        return ee.ImageCollection([])
+    
+    truncate = year2 > 2003 or (year2 == 2003 and monthsOverlap)
+    
+    ls7 = ee.ImageCollection(ls7_dataset)
+    dateFiltered = ee.ImageCollection([])
+    if truncate:
+        fullYears = ee.ImageCollection([])
+        if year1 < 2003:
+            fullYears = ls7.filterDate(f'{year1}-01-01', f'2003-01-01') \
+                    .filter(ee.Filter.calendarRange(month1, month2, "month"))
+
+        truncated = ls7.filterDate(f'2003-01-01', f'2003-05-30') \
+                .filter(ee.Filter.calendarRange(month1, 5, "month"))
+
+        dateFiltered = truncated.merge(fullYears)
+    else:
+        y2 = year2 + 1
+        dateFiltered = ls7.filterDate(f'{year1}-01-01', f'{y2}-01-01') \
+                    .filter(ee.Filter.calendarRange(month1, month2, "month"))
+    
+    return dateFiltered.filterBounds(poly) \
+        .filterMetadata("CLOUD_COVER", "not_greater_than", cloud_cover_limit)
 
 def ls8_imagery(poly: ee.Geometry, year1: int, year2: int, month1: int, month2: int) -> ee.ImageCollection:
     return filtered_ls(ls8_dataset, poly, year1, year2, month1, month2)
@@ -271,11 +300,12 @@ def ls9_imagery(poly: ee.Geometry, year1: int, year2: int, month1: int, month2: 
     return filtered_ls(ls9_dataset, poly, year1, year2, month1, month2)
 
 def filtered_ls(dataset: str, poly: ee.Geometry, year1: int, year2: int, month1: int, month2: int) -> ee.ImageCollection:
+    y2 = year2 + 1
     return ee.ImageCollection(dataset).filterBounds(poly) \
         .filterMetadata("CLOUD_COVER", "not_greater_than", cloud_cover_limit) \
-        .filterDate(f'{year1}-01-01', f'{year2}-12-31') \
-        .filter(ee.Filter.calendarRange(month1, month2, "month")) # handles wrapping if month1 < month2
-    
+        .filterDate(f'{year1}-01-01', f'{y2}-01-01') \
+        .filter(ee.Filter.calendarRange(month1, month2, "month")) # handles wrapping if month1 > month2
+ 
 def etm_to_oli(img: ee.Image) -> ee.Image:
     itcps = ee.Image.constant([0.0003, 0.0088, 0.0061, 0.0412, 0.0254, 0.0172]).multiply(10000)
     slopes = ee.Image.constant([0.8474, 0.8483, 0.9047, 0.8462, 0.8937, 0.9071])
