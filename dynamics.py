@@ -148,6 +148,7 @@ def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: e
     tpers = None
     tgain = None
     fetched = []
+    toFetch = []
     
     # loop through classes and get all stats for each
     for p1, num in enumerate(sortedValues):
@@ -172,9 +173,6 @@ def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: e
                 "name": lab,
                 "area": maskArea(hist.And(cc).selfMask(), geo, scale)
             }))
-        
-        to = to.getInfo()
-        frm = frm.getInfo()
         
         contArea = maskArea(cont.selfMask(), geo, scale)
         histArea = maskArea(hist.selfMask(), geo, scale)
@@ -220,17 +218,12 @@ def lpg_url(mask: ee.Image, color: str) -> str:
     return mask.getMapId(vis)["tile_fetcher"].url_format
 
 def maskArea(mask: ee.Image, geo: ee.Geometry, scale: int) -> ee.Number:
-    ts = 16
-    if scale < 30:
-        ts = 2
-    
     return ee.Number(ee.Image.pixelArea().updateMask(mask).reduceRegion(
             reducer = ee.Reducer.sum(),
             geometry = geo,
-            scale = 100,
+            scale = 30,
             maxPixels = aggregation_max_pixels,
             bestEffort = True,
-            tileScale = ts,
     ).get("area")).round()
 
 def region_csv_stats(region_name: str, geo: ee.Geometry, class_num: int, classImgs: ee.Dictionary, sortedValues: List[int], sortedNames: List[str]) -> Tuple[List[ee.Feature], List[str]]:

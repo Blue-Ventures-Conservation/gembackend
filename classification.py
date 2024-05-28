@@ -293,32 +293,34 @@ def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, ch
         except:
             pass
     
-    # Call getInfo here to produce the samples and avoid so many concurrent aggregations later.
-    # This slows the overall time to respond, but allows sentinel2 classificaiton to succeed.
-    # It may be nice at some point to remove this for Landsat requests.
-    # A longer-term solution for sentinel2, if we continue to encounter too may concurrent aggregations,
-    # would be to force the user to wait on the client for an export
+    sample = None
+    if scale < 20:
+        ts = 1
+        
+        fifth = t_poly.size().divide(2).int().add(1)
+        
+        s1 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth)), props, scale, ts)
+        s2 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth)), props, scale, ts)
+        s3 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth.multiply(2))), props, scale, ts)
+        s4 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth.multiply(3))), props, scale, ts)
+        s5 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth.multiply(4))), props, scale, ts)
+        
+        # this seems to work for splitting the work up to avoid too many concurrent aggregations
+        # while also not requiring us to pull down the full FeatureCollection locally
+        sample = ee.FeatureCollection([s1, s2, s3, s4, s5]).flatten()
+    else:
+        sample = sample_regions(img, t_poly, props, scale, 16)    
     
-    ts = 16
-    if scale < 30:
-        ts = 2
-    
-    sample = img.sampleRegions(
-        collection = t_poly,
-        properties = props,
-        scale = scale,
-        tileScale = ts,
-        geometries = True,
-    ).getInfo()
-    
-    # remove geodesic which is unrecognozed by the API for some reason
-    # remove id because it's not needed
-    for feat in sample.get("features", []):
-        geom = feat.get("geometry", {})
-        geom.pop("geodesic", None)
-        geom.pop("id", None)
-    
-    return ee.FeatureCollection(sample)
+    return sample
+
+def sample_regions(img: ee.Image, collection: ee.FeatureCollection, props: List[str], scale: int, tileScale: int) -> ee.FeatureCollection:
+    return img.sampleRegions(
+            collection = collection,
+            properties = props,
+            scale = scale,
+            tileScale = tileScale,
+            geometries = True,
+    )
 
 def ordered_classes(zipped: list) -> List[str]:
     ordered = []
