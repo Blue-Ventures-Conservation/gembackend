@@ -297,7 +297,7 @@ def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, ch
     if scale < 20:
         ts = 1
         
-        fifth = t_poly.size().divide(2).int().add(1)
+        fifth = t_poly.size().divide(5).int().add(1)
         
         s1 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth)), props, scale, ts)
         s2 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth)), props, scale, ts)
