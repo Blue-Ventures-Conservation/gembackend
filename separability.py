@@ -2,7 +2,7 @@ import ee
 from typing import Dict, List, Tuple
 
 from enum import Enum
-from imagery import chot_imagery, clot_imagery, hhot_imagery, hlot_imagery
+from imagery import cont_imagery, hist_imagery
 from classification import sample_image, ordered_classes
 from assets import asset_error, training_poly
 
@@ -19,25 +19,27 @@ def iToTP(i: int) -> TimePeriod:
 
 def scatter_chart(tpi: int, uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, List[Dict[str, float]]]:
     try:
+        chot, clot, scale = cont_imagery(roi, buff_dist)
+        hhot, hlot, _ = hist_imagery(roi, buff_dist)
         tp = iToTP(tpi)
         if tp == TimePeriod.CONT_HIGH:
-            return scatter_chart_data(uid, key, num_label, char_label, chot_imagery(roi, buff_dist))
+            return scatter_chart_data(uid, key, num_label, char_label, chot, scale)
         if tp == TimePeriod.CONT_LOW:
-            return scatter_chart_data(uid, key, num_label, char_label, clot_imagery(roi, buff_dist))
+            return scatter_chart_data(uid, key, num_label, char_label, clot, scale)
         if tp == TimePeriod.HIST_HIGH:
-            return scatter_chart_data(uid, key, num_label, char_label, hhot_imagery(roi, buff_dist))
+            return scatter_chart_data(uid, key, num_label, char_label, hhot, scale)
         if tp == TimePeriod.HIST_LOW:
-            return scatter_chart_data(uid, key, num_label, char_label, hlot_imagery(roi, buff_dist))
+            return scatter_chart_data(uid, key, num_label, char_label, hlot, scale)
     except Exception as e:
         raise asset_error(e)
 
 # Returns dict of class name to list of dicts of band name to value. Values are reflectance for landsat, or index values.
 # Also contains an ordered list of classes at the root under 'classes'
-def scatter_chart_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> Dict[str, List[Dict[str, float]]]:
+def scatter_chart_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image, scale: int) -> Dict[str, List[Dict[str, float]]]:
     bands = img.bandNames()
     # add ID if present, harmless otherwise
     lbands = bands.add(char_label).add("ID")
-    sample = sample_image(img, training_poly(uid, key, num_label), num_label, char_label)
+    sample = sample_image(img, training_poly(uid, key, num_label), num_label, char_label, scale)
     feats = sample.select(
         propertySelectors = lbands,
         retainGeometry = False,
@@ -62,23 +64,25 @@ def scatter_chart_data(uid: str, key: str, num_label: str, char_label: str, img:
 
 def box_charts(tpi: int, uid: str, key: str, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Dict[str, Dict[str, List[float]]]:
     try:
+        chot, clot, scale = cont_imagery(roi, buff_dist)
+        hhot, hlot, _ = hist_imagery(roi, buff_dist)
         tp = iToTP(tpi)
         if tp == TimePeriod.CONT_HIGH:
-            return box_charts_data(uid, key, num_label, char_label, chot_imagery(roi, buff_dist))
+            return box_charts_data(uid, key, num_label, char_label, chot, scale)
         if tp == TimePeriod.CONT_LOW:
-            return box_charts_data(uid, key, num_label, char_label, clot_imagery(roi, buff_dist))
+            return box_charts_data(uid, key, num_label, char_label, clot, scale)
         if tp == TimePeriod.HIST_HIGH:
-            return box_charts_data(uid, key, num_label, char_label, hhot_imagery(roi, buff_dist))
+            return box_charts_data(uid, key, num_label, char_label, hhot, scale)
         if tp == TimePeriod.HIST_LOW:
-            return box_charts_data(uid, key, num_label, char_label, hlot_imagery(roi, buff_dist))
+            return box_charts_data(uid, key, num_label, char_label, hlot, scale)
     except Exception as e:
         raise asset_error(e)
 
 # Returns dict of class name to dict of band name to list of 5 values. Values are: [min, s1, mean, s2, max].
 # Also contains an ordered list of classes at the root under 'classes'
-def box_charts_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image) -> Dict[str, Dict[str, List[float]]]:
+def box_charts_data(uid: str, key: str, num_label: str, char_label: str, img: ee.Image, scale: int) -> Dict[str, Dict[str, List[float]]]:
     bands = img.bandNames()
-    sample = sample_image(img, training_poly(uid, key, num_label), num_label, char_label)
+    sample = sample_image(img, training_poly(uid, key, num_label), num_label, char_label, scale)
     zipped = zipped_props(sample, num_label, char_label)
     ordered = ordered_classes(zipped.getInfo())
     
@@ -175,15 +179,17 @@ def box_chart_data(filtered: ee.FeatureCollection, bands: ee.List) -> ee.Diction
 
 def correlation_matrix(tpi: int, uid: str, key: str, num_label: str, roi: dict, buff_dist: int) -> Dict[str, List[float]]:
     try:
+        chot, clot, scale = cont_imagery(roi, buff_dist)
+        hhot, hlot, _ = hist_imagery(roi, buff_dist)
         tp = iToTP(tpi)
         if tp == TimePeriod.CONT_HIGH:
-            return pearson_correlation(chot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
+            return pearson_correlation(chot, training_poly(uid, key, num_label))
         if tp == TimePeriod.CONT_LOW:
-            return pearson_correlation(clot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
+            return pearson_correlation(clot, training_poly(uid, key, num_label))
         if tp == TimePeriod.HIST_HIGH:
-            return pearson_correlation(hhot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
+            return pearson_correlation(hhot, training_poly(uid, key, num_label))
         if tp == TimePeriod.HIST_LOW:
-            return pearson_correlation(hlot_imagery(roi, buff_dist), training_poly(uid, key, num_label))
+            return pearson_correlation(hlot, training_poly(uid, key, num_label))
     except Exception as e:
         raise asset_error(e)
 
