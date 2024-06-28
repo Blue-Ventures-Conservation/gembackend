@@ -224,9 +224,10 @@ def correlation_row(band: ee.String, bands: ee.List, img: ee.Image, t_poly: ee.F
 def correlation_cell(img: ee.Image, t_poly: ee.FeatureCollection) -> ee.Number:
     return img.reduceRegion(
         reducer = ee.Reducer.pearsonsCorrelation(),
+        maxPixels = 1e13,
         geometry = t_poly,
-        scale = 150,
-        tileScale = 16
+        scale = 300,
+        tileScale = 4
     ).get('correlation')
 
 def zipped_props(sample: ee.FeatureCollection, num_label: str, char_label: str) -> List[str]:
