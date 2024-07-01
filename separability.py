@@ -223,7 +223,7 @@ def correlation_row(band: ee.String, bands: ee.List, img: ee.Image, t_poly: ee.F
     s4 = correlation_partial_row(base, bands.slice(fifth.multiply(3), fifth.multiply(4)), img, t_poly)
     s5 = correlation_partial_row(base, bands.slice(fifth.multiply(4), fifth.multiply(5)), img, t_poly)
     
-    return ee.List(s1, s2, s3, s4, s5).flatten()
+    return ee.List([s1, s2, s3, s4, s5]).flatten()
 
 def correlation_partial_row(base: ee.Image, bands_sublist: ee.List, img: ee.Image, t_poly: ee.FeatureCollection) -> ee.List:
     def cell(b: str) -> ee.Number:
