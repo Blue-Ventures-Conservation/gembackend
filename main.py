@@ -165,7 +165,7 @@ def classification_route(uid: str):
 def export_classification(uid: str):
     try:
         content = request.json
-        data = classification_export(uid, content["roi"].get("region_uuid", None), content["roi"]["visualize"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["palette"], content["roi"], content["roi"]["buff_dist"])
+        data = classification_export(uid, content["roi"].get("region_uuid", None), content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["palette"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
         return "", error_check("/export_classification", content, e)
     
