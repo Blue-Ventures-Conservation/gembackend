@@ -218,11 +218,11 @@ def correlation_row(band: ee.String, bands: ee.List, img: ee.Image, t_poly: ee.F
     
     fifth = bands.size().divide(5).int().add(1)
     
-    s1 = correlation_partial_row(bands.slice(0, fifth))
-    s2 = correlation_partial_row(bands.slice(fifth, fifth.multiply(2)))
-    s3 = correlation_partial_row(bands.slice(fifth.multiply(2), fifth.multiply(3)))
-    s4 = correlation_partial_row(bands.slice(fifth.multiply(3), fifth.multiply(4)))
-    s5 = correlation_partial_row(bands.slice(fifth.multiply(4), fifth.multiply(5)))
+    s1 = correlation_partial_row(bands.slice(0, fifth), img, t_poly)
+    s2 = correlation_partial_row(bands.slice(fifth, fifth.multiply(2)), img, t_poly)
+    s3 = correlation_partial_row(bands.slice(fifth.multiply(2), fifth.multiply(3)), img, t_poly)
+    s4 = correlation_partial_row(bands.slice(fifth.multiply(3), fifth.multiply(4)), img, t_poly)
+    s5 = correlation_partial_row(bands.slice(fifth.multiply(4), fifth.multiply(5)), img, t_poly)
     
     return ee.List(s1, s2, s3, s4, s5).flatten()
 
