@@ -201,7 +201,7 @@ def pearson_correlation(img: ee.Image, t_poly: ee.FeatureCollection) -> Dict[str
     corr = {"bands": local_bands, "highly_correlated": 0.8, "moderately_correlated": 0.6}
     
     matrix = correlation_rows(s1, bands, img, t_poly) + correlation_rows(s2, bands, img, t_poly) + correlation_rows(s3, bands, img, t_poly)
-
+    
     for idx, r in enumerate(matrix):
         corr[local_bands[idx]] = [round(elem, 3) for elem in r]
     
@@ -210,16 +210,27 @@ def pearson_correlation(img: ee.Image, t_poly: ee.FeatureCollection) -> Dict[str
 def correlation_rows(subset: ee.List, bands: ee.List, img: ee.Image, t_poly: ee.FeatureCollection) -> ee.List:
     def row(band: ee.String) -> ee.List:
         return correlation_row(band, bands, img, t_poly)
-
+    
     return subset.map(row).getInfo()
 
 def correlation_row(band: ee.String, bands: ee.List, img: ee.Image, t_poly: ee.FeatureCollection) -> ee.List:
     base = img.select([band], ['base'])
     
+    fifth = bands.size().divide(5).int().add(1)
+    
+    s1 = correlation_partial_row(bands.slice(0, fifth))
+    s2 = correlation_partial_row(bands.slice(fifth, fifth.multiply(2)))
+    s3 = correlation_partial_row(bands.slice(fifth.multiply(2), fifth.multiply(3)))
+    s4 = correlation_partial_row(bands.slice(fifth.multiply(3), fifth.multiply(4)))
+    s5 = correlation_partial_row(bands.slice(fifth.multiply(4), fifth.multiply(5)))
+    
+    return ee.List(s1, s2, s3, s4, s5).flatten()
+
+def correlation_partial_row(bands_sublist: ee.List, img: ee.Image, t_poly: ee.FeatureCollection) -> ee.List:
     def cell(b: str) -> ee.Number:
         return correlation_cell(img.select([b]).addBands(base), t_poly)
     
-    return bands.map(cell)
+    return bands_sublist.map(cell)
 
 def correlation_cell(img: ee.Image, t_poly: ee.FeatureCollection) -> ee.Number:
     return img.reduceRegion(
@@ -227,7 +238,7 @@ def correlation_cell(img: ee.Image, t_poly: ee.FeatureCollection) -> ee.Number:
         maxPixels = 1e13,
         geometry = t_poly,
         scale = 300,
-        tileScale = 4
+        tileScale = 2
     ).get('correlation')
 
 def zipped_props(sample: ee.FeatureCollection, num_label: str, char_label: str) -> List[str]:
