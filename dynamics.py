@@ -147,14 +147,14 @@ def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: e
                 "area": maskArea(hist.And(cc).selfMask(), geo)
             }))
         
-        contArea = ee.Number(maskArea(cont.selfMask(), geo))
-        histArea = ee.Number(maskArea(hist.selfMask(), geo))
+        contArea = maskArea(cont.selfMask(), geo)
+        histArea = maskArea(hist.selfMask(), geo)
         lossMask = hist.subtract(cont).eq(1).selfMask()
-        lossArea = ee.Number(maskArea(lossMask, geo))
+        lossArea = maskArea(lossMask, geo)
         perMask = hist.And(cont).selfMask()
-        perArea = ee.Number(maskArea(perMask, geo))
+        perArea = maskArea(perMask, geo)
         gainMask = cont.subtract(hist).eq(1).selfMask()
-        gainArea = ee.Number(maskArea(gainMask, geo))
+        gainArea = maskArea(gainMask, geo)
         
         if class_num == num:
             tloss = lossMask
@@ -162,7 +162,7 @@ def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: e
             tgain = gainMask
         
         if not masksOnly:
-            data = ee.Dictionary({
+            data = {
                 "name": label,
                 "loss": lossArea,
                 "persistence": perArea,
@@ -173,15 +173,15 @@ def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: e
                     "to": to,
                     "from": frm,
                 }
-            })
+            }
             
             toFetch.append(data)
-            if len(toFetch) >= 3:
-                fetched = fetched + ee.List(toFetch).getInfo()
+            if len(toFetch) >= 2:
+                fetched = fetched.extend(ee.List(toFetch).getInfo())
                 toFetch.clear()
     
     if len(toFetch) > 0:
-        fetched = fetched + ee.List(toFetch).getInfo()
+        fetched = fetched.extend(ee.List(toFetch).getInfo())
         toFetch.clear()
     
     return fetched, tloss, tpers, tgain
@@ -197,5 +197,4 @@ def maskArea(mask: ee.Image, geo: ee.Geometry) -> ee.Number:
             scale = 30,
             maxPixels = 1e13,
             bestEffort = True,
-            tileScale = 8,
     ).get("area")).round()
