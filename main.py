@@ -171,6 +171,17 @@ def export_classification(uid: str):
     
     return jsonify(data)
 
+@app.route("/dynamics_ready", methods=["POST"])
+@token_check
+def dynamics_ready_route(uid: str):
+    try:
+        content = request.json
+        data = dynamics_ready(uid, content["roi"].get("region_uuid", None), content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"], content["contemporary_classification_image_op"], content["historical_classification_image_op"])
+    except Exception as e:
+        return "", error_check("dynamics_ready", content, e)
+    
+    return jsonify(data)
+
 @app.route("/dynamics", methods=["POST"])
 @token_check
 def dynamics_route(uid: str):

@@ -39,11 +39,12 @@ def make_image_assets(uid: str, imgs: List[ee.Image], keys: List[str], region: e
     if not create_user_asset_folder(uid):
         return None
     
-    assets = []
     ops = []
     for i, img in enumerate(imgs):
         key = keys[i]
         asset_id = asset_name(uid, key)
+        if asset_exists(asset_id):
+            continue
         
         task = ee.batch.Export.image.toAsset(
             image = img,
@@ -53,7 +54,6 @@ def make_image_assets(uid: str, imgs: List[ee.Image], keys: List[str], region: e
             maxPixels = 1e13,
         )
         task.start()
-        assets.append(asset_id)
         ops.append(task.status()['name'])
     
     if wait:
@@ -62,7 +62,7 @@ def make_image_assets(uid: str, imgs: List[ee.Image], keys: List[str], region: e
             if not await_asset(uid, key, op):
                 return None
     
-    return assets
+    return ops
 
 def asset_error(e: Exception) -> Exception:
     estr = str(e)

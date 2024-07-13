@@ -4,8 +4,22 @@ import time
 from typing import List, Tuple
 
 from project import tile_timeout
-from classification import check_for_classified_imagery, combined_classification_lazy
+from classification import get_cached_imagery_or_submit, combined_classification_lazy
 from assets import asset_error, make_export, asset_dl_timeout
+
+def dynamics_ready(uid: str, region_uuid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int, prev_cont_op: str, prev_hist_op: str):
+    try:
+        cont_lazy, hist_lazy, coast, _, _ = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
+        cont, hist, cont_op, hist_op = get_cached_imagery_or_submit(uid, region_uuid, coast, prev_cont_op, prev_hist_op, cont_lazy, hist_lazy)
+        
+        return {
+            "cont_ready": cont is not None,
+            "hist_ready": hist is not None,
+            "cont_op": cont_op,
+            "hist_op": hist_op,
+        }
+    except Exception as e:
+        raise asset_error(e)
 
 def dynamics_export(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
     try:
@@ -73,8 +87,12 @@ def class_images(cont_class: ee.Image, hist_class: ee.Image, sortedValues: List[
     return classImgs
 
 def combine_classes(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Tuple[int, int, ee.Dictionary, ee.Image, ee.Image, ee.Geometry, List[int], List[str]]:
-    cont_class, hist_class, coast, sorts = combined_classification_lazy(uid, False, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
-    cont_class, hist_class = check_for_classified_imagery(uid, region_uuid, coast, True, cont_class, hist_class)
+    cont_class, hist_class, coast, _, sorts = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
+    cont_class, hist_class, _, _ = get_cached_imagery_or_submit(uid, region_uuid, coast, None, None, cont_class, hist_class)
+    
+    if cont_class is None or hist_class is None:
+        raise Exception("classification cache unavailable")
+
     sortedValues = sorts[0]
     sortedNames = sorts[1]
     
@@ -177,11 +195,11 @@ def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: e
             
             toFetch.append(data)
             if len(toFetch) >= 2:
-                fetched = fetched.extend(ee.List(toFetch).getInfo())
+                fetched.extend(ee.List(toFetch).getInfo())
                 toFetch.clear()
     
     if len(toFetch) > 0:
-        fetched = fetched.extend(ee.List(toFetch).getInfo())
+        fetched.extend(ee.List(toFetch).getInfo())
         toFetch.clear()
     
     return fetched, tloss, tpers, tgain

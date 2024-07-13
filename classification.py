@@ -5,7 +5,7 @@ from typing import List, Tuple, Dict, Any
 
 from project import tile_timeout
 from roi import coastline, cont_imagery_collection, hist_imagery_collection, mosaic_indices, known_mangroves, produce_mndwi, produce_ndwi
-from assets import MissingAsset, make_export, make_image_assets, asset_name, asset_exists, asset_error, training_poly, asset_dl_timeout
+from assets import MissingAsset, make_export, make_image_assets, asset_name, asset_exists, check_operation, asset_error, training_poly, asset_dl_timeout
 
 trees = 1000
 splits = 1
@@ -30,23 +30,53 @@ def classification_error(e: Exception) -> Exception:
     else:
         return e
 
-def check_for_classified_imagery(uid: str, region_uuid: str, region: ee.Geometry, make: bool, lazy_cont: ee.Image, lazy_hist: ee.Image) -> Tuple[ee.Image, ee.Image]:
-    if region_uuid is not None:
-        cont_key = cont_class_asset.format(region_uuid = region_uuid)
-        hist_key = hist_class_asset.format(region_uuid = region_uuid)
-        cont_asset_id = asset_name(uid, cont_key)
-        hist_asset_id = asset_name(uid, hist_key)
-        if asset_exists(cont_asset_id) and asset_exists(hist_asset_id):
-            return ee.Image(cont_asset_id), ee.Image(hist_asset_id)
-        elif make:
-            make_image_assets(uid, [lazy_cont, lazy_hist], [cont_key, hist_key], region, False)
-     
-    return lazy_cont, lazy_hist
+def check_cache(uid: str, key: str) -> ee.Image:
+    asset_id = asset_name(uid, key)
+    if asset_exists(asset_id):
+        return ee.Image(asset_id)
+    else:
+        return None
+
+def check_for_cached_classified_imagery(uid: str, region_uuid: str) -> Tuple[str, str, ee.Image, ee.Image]:
+    cont_key = cont_class_asset.format(region_uuid = region_uuid)
+    hist_key = hist_class_asset.format(region_uuid = region_uuid)
+    return cont_key, hist_key, check_cache(uid, cont_key), check_cache(uid, hist_key)
+
+def get_cached_imagery_or_submit(uid: str, region_uuid: str, region: ee.Geometry, prev_cont_op: str, prev_hist_op: str, lazy_cont: ee.Image, lazy_hist: ee.Image) -> Tuple[ee.Image, ee.Image, str, str]:
+    cont_key, hist_key, cont, hist = check_for_cached_classified_imagery(uid, region_uuid)
+    
+    cont_op = prev_cont_op
+    if cont is None:
+        _, err = check_operation(prev_cont_op)
+        if err is not None:
+            cont_op = make_image_assets(uid, [lazy_cont], [cont_key], region, False)[0]
+    
+    hist_op = prev_hist_op
+    if hist is None:
+        _, err = check_operation(prev_hist_op)
+        if err is not None:
+            hist_op = make_image_assets(uid, [lazy_hist], [hist_key], region, False)[0]
+    
+    return cont, hist, cont_op, hist_op
 
 def classification_export(uid: str, region_uuid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int):
     try:
-        cont_class, hist_class, coast, _ = combined_classification_lazy(uid, True, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)
-        cont_class, hist_class = check_for_classified_imagery(uid, region_uuid, coast, False, cont_class, hist_class)
+        cont_class, hist_class, coast, palette, _ = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)
+        _, _, cont_cached, hist_cached = check_for_cached_classified_imagery(uid, region_uuid)
+        
+        if cont_cached is not None:
+            cont_class = cont_cached
+         
+        if hist_cached is not None:
+            hist_class = hist_cached
+        
+        cont_t_poly = training_poly(uid, cont_key, num_label)
+        v = visual(cont_t_poly, num_label, palette)
+        cont_class = cont_classification.visualize(palette = v['palette'], min = v['min'], max = v['max'])
+        
+        hist_t_poly = training_poly(uid, hist_key, num_label)
+        v = visual(hist_t_poly, num_label, palette)
+        hist_class = hist_classification.visualize(palette = v['palette'], min = v['min'], max = v['max'])
         
         cont_task = make_export(uid, cont_class, coast, "contemporary_classification")
         hist_task = make_export(uid, hist_class, coast, "historical_classification")
@@ -79,14 +109,14 @@ def combined_classification(uid: str, region_uuid: str, cont_key: str, hist_key:
     except Exception as e:
         raise asset_error(e)
 
-def combined_classification_lazy(uid: str, vis: bool, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.Geometry, Dict[str, int]]:
+def combined_classification_lazy(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.Geometry, Dict[str, int]]:
     cont_combo, cont_sample, hist_combo, hist_sample, cont_t_poly, hist_t_poly, coast, palette = combined_classification_prep(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)
-    cont_sorts, cont_classification = classify(vis, cont_combo, cont_sample, cont_t_poly, coast, num_label, char_label, palette)
-    hist_sorts, hist_classification = classify(vis, hist_combo, hist_sample, hist_t_poly, coast, num_label, char_label, palette)
+    _, cont_sorts, cont_classification, _, _, _ = classify_lazy(cont_combo, cont_sample, cont_t_poly, coast, num_label, char_label)
+    _, hist_sorts, hist_classification, _, _, _ = classify_lazy(hist_combo, hist_sample, hist_t_poly, coast, num_label, char_label)
     if cont_sorts != hist_sorts:
         raise Exception("class maps did not match between historical and contemporary CRAs during classification")
     
-    return cont_classification, hist_classification, coast, cont_sorts
+    return cont_classification, hist_classification, coast, palette, cont_sorts
 
 def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry, ee.Geometry, ee.Geometry, ee.List]:
     coast = coastline(roi["polygon"])
@@ -135,11 +165,7 @@ def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_con
     
     return cont_combo, cont_sample, hist_combo, hist_sample, ct_poly, ht_poly, coast, expanded_colors
 
-def classify(vis: bool, combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: ee.List) -> Tuple[list, ee.Image]:
-    _, sorts, classified, _, _, _ = classify_lazy(vis, combo, sample, t_poly, coast, num_label, char_label, palette)
-    return sorts, classified
-
-def classify_lazy(vis: bool, combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: ee.List) -> Tuple[List[str], list, ee.Image, Any, ee.FeatureCollection, ee.FeatureCollection]:
+def classify_lazy(combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str) -> Tuple[List[str], list, ee.Image, Any, ee.FeatureCollection, ee.FeatureCollection]:
     bands = combo.bandNames()
     sorts = ee.FeatureCollection(t_poly).distinct(num_label).sort(num_label);
     nums = sorts.aggregate_array(num_label);
@@ -164,11 +190,7 @@ def classify_lazy(vis: bool, combo: ee.Image, sample: ee.FeatureCollection, t_po
     )
     
     classified = combo.classify(classifier).clip(coast)
-    
-    if vis == True:
-        v = visual(t_poly, num_label, palette)
-        classified = classified.visualize(palette = v['palette'], min = v['min'], max = v['max'])
-    
+     
     return classes, sorteds, classified, classifier, training, validation
 
 def visual(t_poly: ee.FeatureCollection, num_label: str, palette: ee.List) -> dict:
@@ -184,10 +206,11 @@ def visual(t_poly: ee.FeatureCollection, num_label: str, palette: ee.List) -> di
     return ee.Dictionary({"min": min_no, "max": max_no, "palette": palette}).getInfo()
 
 def classify_fully(uid: str, region_uuid: str, asset_fmt: str, region: ee.Geometry, combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.FeatureCollection, coast: ee.Geometry, num_label: str, char_label: str, palette: ee.List) -> Tuple[dict, List[str]]:
-    classes, _, classified, classifier, training, validation = classify_lazy(False, combo, sample, t_poly, coast, num_label, char_label, palette)
+    classes, _, classified, classifier, training, validation = classify_lazy(combo, sample, t_poly, coast, num_label, char_label)
     
+    image_op = ""
     if region_uuid is not None:
-        make_image_assets(uid, [classified], [asset_fmt.format(region_uuid = region_uuid)], region, False)
+        image_op = make_image_assets(uid, [classified], [asset_fmt.format(region_uuid = region_uuid)], region, False)[0]
     
     train_accuracy = classifier.confusionMatrix()
     validated = validation.classify(classifier)
@@ -202,6 +225,7 @@ def classify_fully(uid: str, region_uuid: str, asset_fmt: str, region: ee.Geomet
         "url": classification_url,
         "resubstitution_accuracy": float(train_acc),
         "validation_accuracy": float(test_acc),
+        "image_op": image_op,
     }, classes
 
 def final_mask(coast: ee.Geometry, clot: ee.Image, hlot: ee.Image) -> ee.Image:
