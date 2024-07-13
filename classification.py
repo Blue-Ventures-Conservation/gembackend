@@ -47,14 +47,14 @@ def get_cached_imagery_or_submit(uid: str, region_uuid: str, region: ee.Geometry
     
     cont_op = prev_cont_op
     if cont is None:
-        _, err = check_operation(prev_cont_op)
-        if err is not None:
+        succeeded, err = check_operation(prev_cont_op)
+        if err is not None or (succeeded and check_cache(uid, cont_key) is None):
             cont_op = make_image_assets(uid, [lazy_cont], [cont_key], region, False)[0]
     
     hist_op = prev_hist_op
     if hist is None:
-        _, err = check_operation(prev_hist_op)
-        if err is not None:
+        succeeded, err = check_operation(prev_hist_op)
+        if err is not None or (succeeded and check_cache(uid, hist_key) is None):
             hist_op = make_image_assets(uid, [lazy_hist], [hist_key], region, False)[0]
     
     return cont, hist, cont_op, hist_op
