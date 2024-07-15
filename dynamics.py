@@ -9,8 +9,8 @@ from assets import asset_error, make_export, asset_dl_timeout
 
 def dynamics_ready(uid: str, region_uuid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int, prev_cont_op: str, prev_hist_op: str):
     try:
-        cont_lazy, hist_lazy, coast, _, _ = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
-        cont, hist, cont_op, hist_op = get_cached_imagery_or_submit(uid, region_uuid, coast, prev_cont_op, prev_hist_op, cont_lazy, hist_lazy)
+        cont_lazy, hist_lazy, region, _, _ = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
+        cont, hist, cont_op, hist_op = get_cached_imagery_or_submit(uid, region_uuid, region, prev_cont_op, prev_hist_op, cont_lazy, hist_lazy)
         
         return {
             "cont_ready": cont is not None,
@@ -23,16 +23,16 @@ def dynamics_ready(uid: str, region_uuid: str, cont_key: str, hist_key: str, use
 
 def dynamics_export(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
     try:
-        class_num, _, cont_class, hist_class, coast, sortedValues, sortedNames = combine_classes(uid,region_uuid, target_classes, combined_name, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
+        class_num, _, cont_class, hist_class, region, sortedValues, sortedNames = combine_classes(uid,region_uuid, target_classes, combined_name, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
         classImgs = class_images(cont_class, hist_class, sortedValues)
-        _, lmask, pmask, gmask = region_stats(True, coast, class_num, classImgs, sortedValues, sortedNames)
+        _, lmask, pmask, gmask = region_stats(True, region, class_num, classImgs, sortedValues, sortedNames)
         
         lmask = lmask.visualize(palette = red)
         pmask = pmask.visualize(palette = green)
         gmask = gmask.visualize(palette = blue)
-        ltask = make_export(uid, lmask, coast, "loss")
-        ptask = make_export(uid, pmask, coast, "persistence")
-        gtask = make_export(uid, gmask, coast, "gain")
+        ltask = make_export(uid, lmask, region, "loss")
+        ptask = make_export(uid, pmask, region, "persistence")
+        gtask = make_export(uid, gmask, region, "gain")
         
         return {
             "loss": ltask,
@@ -87,8 +87,8 @@ def class_images(cont_class: ee.Image, hist_class: ee.Image, sortedValues: List[
     return classImgs
 
 def combine_classes(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Tuple[int, int, ee.Dictionary, ee.Image, ee.Image, ee.Geometry, List[int], List[str]]:
-    cont_class, hist_class, coast, _, sorts = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
-    cont_class, hist_class, _, _ = get_cached_imagery_or_submit(uid, region_uuid, coast, None, None, cont_class, hist_class)
+    cont_class, hist_class, region, _, sorts = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
+    cont_class, hist_class, _, _ = get_cached_imagery_or_submit(uid, region_uuid, region, None, None, cont_class, hist_class)
     
     if cont_class is None or hist_class is None:
         raise Exception("classification cache unavailable")
@@ -126,7 +126,7 @@ def combine_classes(uid: str, region_uuid: str, target_classes: List[str], combi
         cont_class = cont_class.multiply(cont_neg).add(cont_combo)
         hist_class = hist_class.multiply(hist_neg).add(hist_combo)
      
-    return class_num, sortedValues.index(class_num), cont_class, hist_class, coast, sortedValues, sortedNames
+    return class_num, sortedValues.index(class_num), cont_class, hist_class, region, sortedValues, sortedNames
 
 def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: ee.Dictionary, sortedValues: List[int], sortedNames: List[str]) -> Tuple[List[dict], ee.Image, ee.Image, ee.Image]:
     def contHist(pos):

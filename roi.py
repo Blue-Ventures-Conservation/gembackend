@@ -42,7 +42,7 @@ def ls_imagery_export(uid: str, vis: bool, roi: dict, buff_dist: int):
         chot = chot.visualize(bands = ls_visual['bands'], min = ls_visual['min'], max = ls_visual['max'])
         clot = clot.visualize(bands = ls_visual['bands'], min = ls_visual['min'], max = ls_visual['max'])
     
-    coast = buffered_coastline(ee.Geometry(roi["polygon"]), buff_dist)
+    coast = buffered_coastline(ee.Geometry(roi["polygon"]), buff_dist, roi.get("excludes", []))
     
     hhot_task = make_export(uid, hhot, coast, "historical_high_tide")
     hlot_task = make_export(uid, hlot, coast, "historical_low_tide")
@@ -63,9 +63,13 @@ def known_mangroves() -> ee.Image:
     gmw = ee.Image("projects/earthengine-legacy/assets/projects/sat-io/open-datasets/GMW/union/gmw_v3_mng_union")
     return giri.blend(gmw)
 
-def buffered_coastline(roi_poly: ee.Geometry, buff_dist: int) -> ee.Geometry:
+def buffered_coastline(roi_poly: ee.Geometry, buff_dist: int, excludes: List[dict]) -> ee.Geometry:
     coast = coastline(roi_poly)
-    return coast.buffer(buff_dist).intersection(roi_poly)
+    buffed = coast.buffer(buff_dist).intersection(roi_poly)
+    for exclude in excludes:
+        buffed = buffed.difference(ee.Geometry(excludes))
+    
+    return buffed
 
 # poly here should be the dict equivalent of a geojson polygon
 def coastline(roi_poly: ee.Geometry) -> ee.Geometry:
@@ -211,11 +215,11 @@ def get_imagery_collection(buff_dist: int, indices: List[str], poly: dict, exclu
     if img_count <= 0:
         raise NoImages()
     
-    imgs = imgs.map(apply_scale_factors).map(fix_float).map(doubleOO).map(cloud_mask)
-    imgs = tide_bands(shore_refl(imgs, zone, buffered_roi_poly))
-    
     for exclude in excludes:
         buffered_roi_poly = buffered_roi_poly.difference(exclude)
+    
+    imgs = imgs.map(apply_scale_factors).map(fix_float).map(doubleOO).map(cloud_mask)
+    imgs = tide_bands(shore_refl(imgs, zone, buffered_roi_poly))
     
     return imgs, buffered_roi_poly, indices
  
