@@ -35,9 +35,9 @@ def make_export(uid: str, img: ee.Image, region: ee.Geometry, name: str) -> str:
         'path': fprefix + ".tif"
     }
 
-def make_image_assets(uid: str, imgs: List[ee.Image], keys: List[str], region: ee.Geometry, wait: bool) -> List[str]:
+def make_image_assets(uid: str, imgs: List[ee.Image], keys: List[str], region: ee.Geometry) -> List[str]:
     if not create_user_asset_folder(uid):
-        return None
+        return []
     
     ops = []
     for i, img in enumerate(imgs):
@@ -55,12 +55,6 @@ def make_image_assets(uid: str, imgs: List[ee.Image], keys: List[str], region: e
         )
         task.start()
         ops.append(task.status()['name'])
-    
-    if wait:
-        for i, key in enumerate(keys):
-            op = ops[i]
-            if not await_asset(uid, key, op):
-                return None
     
     return ops
 

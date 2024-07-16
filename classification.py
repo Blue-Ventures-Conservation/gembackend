@@ -49,13 +49,13 @@ def get_cached_imagery_or_submit(uid: str, region_uuid: str, region: ee.Geometry
     if cont is None:
         succeeded, err = check_operation(prev_cont_op)
         if err is not None or (succeeded and check_cache(uid, cont_key) is None):
-            cont_op = make_image_assets(uid, [lazy_cont], [cont_key], region, False)[0]
+            cont_op = make_image_assets(uid, [lazy_cont], [cont_key], region)[0]
     
     hist_op = prev_hist_op
     if hist is None:
         succeeded, err = check_operation(prev_hist_op)
         if err is not None or (succeeded and check_cache(uid, hist_key) is None):
-            hist_op = make_image_assets(uid, [lazy_hist], [hist_key], region, False)[0]
+            hist_op = make_image_assets(uid, [lazy_hist], [hist_key], region)[0]
     
     return cont, hist, cont_op, hist_op
 
@@ -208,7 +208,9 @@ def classify_fully(uid: str, region_uuid: str, asset_fmt: str, region: ee.Geomet
     
     image_op = ""
     if region_uuid is not None:
-        image_op = make_image_assets(uid, [classified], [asset_fmt.format(region_uuid = region_uuid)], region, False)[0]
+        ops = make_image_assets(uid, [classified], [asset_fmt.format(region_uuid = region_uuid)], region)
+        if len(ops) > 0:
+            image_op = ops[0]
     
     train_accuracy = classifier.confusionMatrix()
     validated = validation.classify(classifier)
