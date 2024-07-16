@@ -77,13 +77,10 @@ def coastline(roi_poly: ee.Geometry) -> ee.Geometry:
     big_islands = ee.FeatureCollection('projects/sat-io/open-datasets/shoreline/big_islands')
     small_islands = ee.FeatureCollection('projects/sat-io/open-datasets/shoreline/small_islands')
     # use the roi to clip the world boundary polygons
-    area = mainlands.merge(big_islands).merge(small_islands).filterBounds(roi_poly).geometry()
+    area = mainlands.merge(big_islands).merge(small_islands).filterBounds(roi_poly)
 
-    def geom_coords(geo: ee.Geometry) -> ee.List:
-        return ee.Geometry(geo).coordinates()
-    
     # convert the geometries to a coordinate list
-    area_coords = area.geometries().map(geom_coords).flatten()
+    area_coords = ee.Geometry.MultiPolygon(area.geometry().geometries()).dissolve().coordinates().flatten()
     # use the coordinates to create a sting geometry
     area_point = ee.Geometry.MultiPoint(area_coords)
     
