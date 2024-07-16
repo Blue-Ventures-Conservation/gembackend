@@ -3,13 +3,8 @@ import time
 
 from typing import List, Tuple, Dict, Any
 
-<<<<<<< HEAD
 from project import tile_timeout
 from roi import known_mangroves
-=======
-from project import tile_timeout, aggregation_max_pixels
-from roi import coastline, known_mangroves
->>>>>>> f183132 (some vars for max pixels, adjust tileScale based on image scale, coarsen area calculation)
 from imagery import cont_imagery_collection, hist_imagery_collection, mosaic_indices, produce_mndwi, produce_ndwi
 from assets import MissingAsset, make_export, make_image_assets, asset_name, asset_exists, check_operation, asset_error, training_poly, asset_dl_timeout
 
