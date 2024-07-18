@@ -31,7 +31,7 @@ def dynamics_export(uid: str, region_uuid: str, target_classes: List[str], combi
             sr_stats, _ = region_csv_stats(sr["name"], ee.Geometry(sr["geometry"]), class_num, classImgs, sortedValues, sortedNames)
             roi_stats = roi_stats + sr_stats
         
-        csvTask = make_table_export(uid, ee.FeatureCollection(roi_stats), selectors, "csv_stats")
+        csvTask = make_table_export(uid, ee.FeatureCollection(roi_stats), selectors, "dynamics_hectares")
         
         _, lmask, pmask, gmask = region_stats(True, region, class_num, classImgs, sortedValues, sortedNames)
         
