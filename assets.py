@@ -1,6 +1,6 @@
 import ee, logging, uuid
 
-from typing import Tuple, List
+from typing import Dict, Tuple, List
 import time
 import project
 
@@ -16,7 +16,7 @@ asset_dl_timeout = 47 * 60 * 60
 class MissingAsset(Exception):
     pass
 
-def make_export(uid: str, img: ee.Image, region: ee.Geometry, name: str) -> str:
+def make_export(uid: str, img: ee.Image, region: ee.Geometry, name: str) -> Dict[str, str]:
     slug = uuid.uuid4().hex
     fprefix = asset_user_downloads.format(uid = uid, name = name, slug = slug)
     bucket = asset_default_bucket.format(project_id = project.project_id)
@@ -33,6 +33,23 @@ def make_export(uid: str, img: ee.Image, region: ee.Geometry, name: str) -> str:
     return {
         'task': task.status()['name'],
         'path': fprefix + ".tif"
+    }
+
+def make_table_export(uid: str, table: ee.FeatureCollection, selectors: List[str], name: str) -> Dict[str, str]:
+    slug = uuid.uuid4().hex
+    fprefix = asset_user_downloads.format(uid = uid, name = name, slug = slug)
+    bucket = asset_default_bucket.format(project_id = project.project_id)
+    task = ee.batch.Export.table.toCloudStorage(
+        fileNamePrefix = fprefix,
+        bucket = bucket,
+        collection = table,
+        selectors = selectors,
+    )
+    task.start()
+    
+    return {
+        'task': task.status()['name'],
+        'path': fprefix + ".csv"
     }
 
 def make_image_assets(uid: str, imgs: List[ee.Image], keys: List[str], region: ee.Geometry) -> List[str]:

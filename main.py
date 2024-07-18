@@ -200,7 +200,7 @@ def export_dynamics(uid: str):
     try:
         content = request.json
         targets = dynamics_target_classes(content)
-        data = dynamics_export(uid, content["roi"].get("region_uuid", None), targets, content.get("combined_name", targets[0]), content["red"], content["green"], content["blue"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
+        data = dynamics_export(uid, content["roi"].get("region_uuid", None), targets, content.get("combined_name", targets[0]), content["sub_regions"], content["red"], content["green"], content["blue"], content["contemporary_storage_key"], content["historical_storage_key"], content["use_cont_spec"], content["num_label"], content["char_label"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
         return "", error_check("/export_dynamics", content, e)
     

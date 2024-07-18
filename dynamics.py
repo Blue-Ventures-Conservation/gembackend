@@ -1,11 +1,11 @@
 import ee
 import time
 
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 from project import tile_timeout
 from classification import get_cached_imagery_or_submit, combined_classification_lazy
-from assets import asset_error, make_export, asset_dl_timeout
+from assets import asset_error, make_export, make_table_export, asset_dl_timeout
 
 def dynamics_ready(uid: str, region_uuid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int, prev_cont_op: str, prev_hist_op: str):
     try:
@@ -21,10 +21,18 @@ def dynamics_ready(uid: str, region_uuid: str, cont_key: str, hist_key: str, use
     except Exception as e:
         raise asset_error(e)
 
-def dynamics_export(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
+def dynamics_export(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, sub_regions: List[dict], red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
     try:
         class_num, _, cont_class, hist_class, region, sortedValues, sortedNames = combine_classes(uid,region_uuid, target_classes, combined_name, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
         classImgs = class_images(cont_class, hist_class, sortedValues)
+        
+        roi_stats, selectors = region_csv_stats(roi["name"], region, class_num, classImgs, sortedValues, sortedNames)
+        for sr in sub_regions:
+            sr_stats, _ = region_csv_stats(sr["name"], ee.Geometry(sr["geometry"]), class_num, classImgs, sortedValues, sortedNames)
+            roi_stats = roi_stats + sr_stats
+        
+        csvTask = make_table_export(uid, ee.FeatureCollection(roi_stats), selectors, "csv_stats")
+        
         _, lmask, pmask, gmask = region_stats(True, region, class_num, classImgs, sortedValues, sortedNames)
         
         lmask = lmask.visualize(palette = red)
@@ -38,6 +46,7 @@ def dynamics_export(uid: str, region_uuid: str, target_classes: List[str], combi
             "loss": ltask,
             "persistence": ptask,
             "gain": gtask,
+            "csv": csvTask,
             "created_at": int(time.time()),
             "timeout": asset_dl_timeout
         }
@@ -194,7 +203,7 @@ def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: e
             }
             
             toFetch.append(data)
-            if len(toFetch) >= 2:
+            if len(toFetch) >= 3:
                 fetched.extend(ee.List(toFetch).getInfo())
                 toFetch.clear()
     
@@ -216,3 +225,52 @@ def maskArea(mask: ee.Image, geo: ee.Geometry) -> ee.Number:
             maxPixels = 1e13,
             bestEffort = True,
     ).get("area")).round()
+
+def region_csv_stats(region_name: str, geo: ee.Geometry, class_num: int, classImgs: ee.Dictionary, sortedValues: List[int], sortedNames: List[str]) -> Tuple[List[ee.Feature], List[str]]:
+    csv_stats = []
+    api_stats, _, _, _ = region_stats(False, geo, class_num, classImgs, sortedValues, sortedNames)
+    for stats in api_stats:
+        convDat, selectors = conversionData(stats["conversions"], sortedNames)
+        data = {
+                "Region": region_name,
+                "Class": stats["name"],
+                "Contemporary": stats["cont"],
+                "Historical": stats["hist"],
+                "Loss": stats["loss"],
+                "Persistence": stats["persistence"],
+                "Gain": stats["gain"],
+        }
+        data.update(convDat)
+        # the geometry here is just a placeholder, we will export the CSV without it
+        csv_stats.append(ee.Feature(ee.Geometry.Point([0,0]), data))
+    
+    return csv_stats, selectors
+
+def conversionData(conv: Dict[str, List[dict]], sortedNames: List[str]) -> Tuple[dict, List[str]]:
+    dat = {}
+    from_selectors = []
+    to_selectors = []
+    
+    toFrmIndex = 0
+    for name in sortedNames:
+        fromKey = "Conversion from " + name
+        toKey = "Conversion to " + name
+        from_selectors.append(fromKey)
+        to_selectors.append(toKey)
+        
+        if not (toFrmIndex < len(conv["from"]) and toFrmIndex < len(conv["to"])):
+            dat[toKey] = None
+            dat[fromKey] = None
+            continue
+        
+        to = conv["to"][toFrmIndex]
+        frm = conv["from"][toFrmIndex]
+        if frm["name"] == name and to["name"] == name:
+            dat[toKey] = to["area"]
+            dat[fromKey] = frm["area"]
+            toFrmIndex += 1
+        else:
+            dat[toKey] = None
+            dat[fromKey] = None
+    
+    return dat, from_selectors + to_selectors
