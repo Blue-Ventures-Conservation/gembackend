@@ -234,11 +234,11 @@ def region_csv_stats(region_name: str, geo: ee.Geometry, class_num: int, classIm
         data = {
                 "Region": region_name,
                 "Class": stats["name"],
-                "Contemporary": stats["cont"],
-                "Historical": stats["hist"],
-                "Loss": stats["loss"],
-                "Persistence": stats["persistence"],
-                "Gain": stats["gain"],
+                "Contemporary": round(stats["cont"]/10)/1e3,
+                "Historical": round(stats["hist"]/10)/1e3,
+                "Loss": round(stats["loss"]/10)/1e3,
+                "Persistence": round(stats["persistence"]/10)/1e3,
+                "Gain": round(stats["gain"]/10)/1e3,
         }
         data.update(convDat)
         # the geometry here is just a placeholder, we will export the CSV without it
@@ -266,8 +266,8 @@ def conversionData(conv: Dict[str, List[dict]], sortedNames: List[str]) -> Tuple
         to = conv["to"][toFrmIndex]
         frm = conv["from"][toFrmIndex]
         if frm["name"] == name and to["name"] == name:
-            dat[toKey] = to["area"]
-            dat[fromKey] = frm["area"]
+            dat[toKey] = round(to["area"]/10)/1e3
+            dat[fromKey] = round(frm["area"]/10)/1e3
             toFrmIndex += 1
         else:
             dat[toKey] = None
