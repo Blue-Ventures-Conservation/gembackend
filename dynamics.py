@@ -244,7 +244,7 @@ def region_csv_stats(region_name: str, geo: ee.Geometry, class_num: int, classIm
         # the geometry here is just a placeholder, we will export the CSV without it
         csv_stats.append(ee.Feature(ee.Geometry.Point([0,0]), data))
     
-    return csv_stats, selectors
+    return csv_stats, ["Region", "Class", "Contemporary", "Historical", "Loss", "Persistence", "Gain"] + selectors
 
 def conversionData(conv: Dict[str, List[dict]], sortedNames: List[str]) -> Tuple[dict, List[str]]:
     dat = {}
