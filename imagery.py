@@ -30,7 +30,7 @@ s2_scale = 10
 s2_qa_pixel = "QA60"
 s2_cloud_property = "CLOUDY_PIXEL_PERCENTAGE"
 s2_bands = ['B2','B3','B4','B8','B11','B12']
-s2_cloudscore_band = 'cs'
+s2_cloudscore_band = 'cs_cdf'
 
 # temp names used for calculating spectral indices
 optical_bands = ['B1','B2','B3','B4','B5','B7']
@@ -238,7 +238,7 @@ def s2_cloud_mask(imgs: ee.ImageCollection) -> ee.ImageCollection:
     return imgs.linkCollection(ee.ImageCollection('GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED'), [s2_cloudscore_band]).map(s2_cloud_filter)
 
 def s2_cloud_filter(img: ee.Image) -> ee.Image:
-    return img.updateMask(img.select(s2_cloudscore_band).gte(0.60))
+    return img.updateMask(img.select(s2_cloudscore_band).gte(0.85))
 
 def ls4_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: int, month1: int, month2: int) -> ee.ImageCollection:
     return filter_collection(ls4_dataset, poly, ls_cloud_property, cloud_limit, year1, year2, month1, month2)

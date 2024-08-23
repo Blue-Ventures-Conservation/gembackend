@@ -122,11 +122,15 @@ def combined_classification_lazy(uid: str, cont_key: str, hist_key: str, use_con
     return cont_classification, hist_classification, region, palette, cont_sorts, scale
 
 def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry, ee.Geometry, ee.Geometry, ee.List, int]:
+    min_avg = default_min_avg
     conts, buf_excl_roi, indices, scale = cont_imagery_collection(roi, buff_dist)
-    cont_water = ee.ImageCollection(conts).filter(ee.Filter.gte('MNDWI', default_min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
+    if scale < 30:
+        min_avg = 0.75
+
+    cont_water = ee.ImageCollection(conts).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
 
     hists, _, _, _ = hist_imagery_collection(roi, buff_dist)
-    hist_water = ee.ImageCollection(hists).filter(ee.Filter.gte('MNDWI', default_min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
+    hist_water = ee.ImageCollection(hists).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
 
     fmask = final_mask(buf_excl_roi, cont_water, hist_water)
 
@@ -141,10 +145,10 @@ def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_con
     
     ct_poly = training_poly(uid, cont_key, num_label)
     ht_poly = training_poly(uid, hist_key, num_label)
-    cont_sample = sample_image(cont_combo, ct_poly, num_label, char_label, scale)
+    cont_sample = sample_image(cont_combo, ct_poly, [num_label, char_label, "ID"], scale, True)
     hist_sample = cont_sample
     if not use_cont_spec:
-        hist_sample = sample_image(hist_combo, ht_poly, num_label, char_label, scale)
+        hist_sample = sample_image(hist_combo, ht_poly, [num_label, char_label, "ID"], scale, True)
     
     expanded_colors = ee.List([])
     if palette is not None:
@@ -278,43 +282,34 @@ def topo_mask(dsm: ee.Image, scale: int, mangs: ee.Image) -> ee.Image:
     
     return dsm.select('elev').lte(el_val).And(dsm.select('slope').lte(slp_val)).double()
 
-def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, num_label: str, char_label: str, scale: int) -> ee.FeatureCollection:
-    props = [num_label, char_label]
-    
-    if t_poly.aggregate_count("ID").eq(t_poly.size()).getInfo() == 1:
-        try:
-            isANum = t_poly.first().getNumber("ID").getInfo()
-            props.append("ID")
-        except:
-            pass
-    
+def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, props: List[str], scale: int, geometries: bool) -> ee.FeatureCollection:
     sample = None
-    if scale < 20:
+    if scale < 30:
         ts = 1
         
         fifth = t_poly.size().divide(5).int().add(1)
         
-        s1 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth)), props, scale, ts)
-        s2 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth)), props, scale, ts)
-        s3 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth.multiply(2))), props, scale, ts)
-        s4 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth.multiply(3))), props, scale, ts)
-        s5 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth.multiply(4))), props, scale, ts)
+        s1 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth)), props, scale, ts, geometries)
+        s2 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth)), props, scale, ts, geometries)
+        s3 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth.multiply(2))), props, scale, ts, geometries)
+        s4 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth.multiply(3))), props, scale, ts, geometries)
+        s5 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth.multiply(4))), props, scale, ts, geometries)
         
         # this seems to work for splitting the work up to avoid too many concurrent aggregations
         # while also not requiring us to pull down the full FeatureCollection locally
         sample = ee.FeatureCollection([s1, s2, s3, s4, s5]).flatten()
     else:
-        sample = sample_regions(img, t_poly, props, scale, 16)    
+        sample = sample_regions(img, t_poly, props, scale, 16, geometries)
     
     return sample
 
-def sample_regions(img: ee.Image, collection: ee.FeatureCollection, props: List[str], scale: int, tileScale: int) -> ee.FeatureCollection:
+def sample_regions(img: ee.Image, collection: ee.FeatureCollection, props: List[str], scale: int, tileScale: int, geometries: bool) -> ee.FeatureCollection:
     return img.sampleRegions(
             collection = collection,
             properties = props,
             scale = scale,
             tileScale = tileScale,
-            geometries = True,
+            geometries = geometries,
     )
 
 def ordered_classes(zipped: list) -> List[str]:
