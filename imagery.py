@@ -76,7 +76,7 @@ def buffered_coastline(roi_poly: ee.Geometry, buff_dist: int, excludes: List[dic
     coast = coastline(roi_poly)
     buffed = coast.buffer(buff_dist).intersection(roi_poly)
     for exclude in excludes:
-        buffed = buffed.difference(ee.Geometry(excludes))
+        buffed = buffed.difference(ee.Geometry(exclude))
     
     return buffed
 

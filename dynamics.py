@@ -26,9 +26,9 @@ def dynamics_export(uid: str, region_uuid: str, target_classes: List[str], combi
         class_num, _, cont_class, hist_class, region, sortedValues, sortedNames, scale = combine_classes(uid,region_uuid, target_classes, combined_name, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
         classImgs = class_images(cont_class, hist_class, sortedValues)
         
-        roi_stats, selectors = region_csv_stats(roi["name"], region, class_num, classImgs, sortedValues, sortedNames)
+        roi_stats, selectors = region_csv_stats(roi["name"], region, class_num, classImgs, sortedValues, sortedNames, scale)
         for sr in sub_regions:
-            sr_stats, _ = region_csv_stats(sr["name"], ee.Geometry(sr["geometry"]), class_num, classImgs, sortedValues, sortedNames)
+            sr_stats, _ = region_csv_stats(sr["name"], ee.Geometry(sr["geometry"]), class_num, classImgs, sortedValues, sortedNames, scale)
             roi_stats = roi_stats + sr_stats
         
         csvTask = make_table_export(uid, ee.FeatureCollection(roi_stats), selectors, "dynamics_hectares")
@@ -203,7 +203,7 @@ def region_stats(masksOnly: bool, geo: ee.Geometry, class_num: int, classImgs: e
             }
             
             toFetch.append(data)
-            if len(toFetch) >= 3:
+            if len(toFetch) >= 1:
                 fetched.extend(ee.List(toFetch).getInfo())
                 toFetch.clear()
     
@@ -221,14 +221,14 @@ def maskArea(mask: ee.Image, geo: ee.Geometry, scale: int) -> ee.Number:
     return ee.Number(ee.Image.pixelArea().updateMask(mask).reduceRegion(
             reducer = ee.Reducer.sum(),
             geometry = geo,
-            scale = 30,
+            scale = scale,
             maxPixels = aggregation_max_pixels,
             bestEffort = True,
     ).get("area")).round()
 
-def region_csv_stats(region_name: str, geo: ee.Geometry, class_num: int, classImgs: ee.Dictionary, sortedValues: List[int], sortedNames: List[str]) -> Tuple[List[ee.Feature], List[str]]:
+def region_csv_stats(region_name: str, geo: ee.Geometry, class_num: int, classImgs: ee.Dictionary, sortedValues: List[int], sortedNames: List[str], scale: int) -> Tuple[List[ee.Feature], List[str]]:
     csv_stats = []
-    api_stats, _, _, _ = region_stats(False, geo, class_num, classImgs, sortedValues, sortedNames)
+    api_stats, _, _, _ = region_stats(False, geo, class_num, classImgs, sortedValues, sortedNames, scale)
     for stats in api_stats:
         convDat, selectors = conversionData(stats["conversions"], sortedNames)
         data = {

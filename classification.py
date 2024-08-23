@@ -52,13 +52,13 @@ def get_cached_imagery_or_submit(uid: str, region_uuid: str, region: ee.Geometry
     if cont is None:
         succeeded, err = check_operation(prev_cont_op)
         if err is not None or (succeeded and check_cache(uid, cont_key) is None):
-            cont_op = make_image_assets(uid, [lazy_cont], [cont_key], region)[0]
+            cont_op = make_image_assets(uid, [lazy_cont], [cont_key], region, scale)[0]
     
     hist_op = prev_hist_op
     if hist is None:
         succeeded, err = check_operation(prev_hist_op)
         if err is not None or (succeeded and check_cache(uid, hist_key) is None):
-            hist_op = make_image_assets(uid, [lazy_hist], [hist_key], region)[0]
+            hist_op = make_image_assets(uid, [lazy_hist], [hist_key], region, scale)[0]
     
     return cont, hist, cont_op, hist_op
 
@@ -75,11 +75,11 @@ def classification_export(uid: str, region_uuid: str, cont_key: str, hist_key: s
         
         cont_t_poly = training_poly(uid, cont_key, num_label)
         v = visual(cont_t_poly, num_label, palette)
-        cont_class = cont_classification.visualize(palette = v['palette'], min = v['min'], max = v['max'])
+        cont_class = cont_class.visualize(palette = v['palette'], min = v['min'], max = v['max'])
         
         hist_t_poly = training_poly(uid, hist_key, num_label)
         v = visual(hist_t_poly, num_label, palette)
-        hist_class = hist_classification.visualize(palette = v['palette'], min = v['min'], max = v['max'])
+        hist_class = hist_class.visualize(palette = v['palette'], min = v['min'], max = v['max'])
         
         cont_task = make_export(uid, cont_class, region, "contemporary_classification", scale)
         hist_task = make_export(uid, hist_class, region, "historical_classification", scale)
@@ -96,8 +96,8 @@ def classification_export(uid: str, region_uuid: str, cont_key: str, hist_key: s
 def combined_classification(uid: str, region_uuid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int):
     try:
         cont_combo, cont_sample, hist_combo, hist_sample, cont_t_poly, hist_t_poly, region, palette, scale = combined_classification_prep(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)
-        cont_classification, cont_classes = classify_fully(uid, region_uuid, cont_class_asset, region, cont_combo, cont_sample, cont_t_poly, coast, num_label, char_label, palette, scale)
-        hist_classification, hist_classes = classify_fully(uid, region_uuid, hist_class_asset, region, hist_combo, hist_sample, hist_t_poly, coast, num_label, char_label, palette, scale)
+        cont_classification, cont_classes = classify_fully(uid, region_uuid, cont_class_asset, region, cont_combo, cont_sample, cont_t_poly, num_label, char_label, palette, scale)
+        hist_classification, hist_classes = classify_fully(uid, region_uuid, hist_class_asset, region, hist_combo, hist_sample, hist_t_poly, num_label, char_label, palette, scale)
         
         if cont_classes != hist_classes:
             raise Exception("classes did not match between historical and contemporary CRAs during classification")
@@ -215,7 +215,7 @@ def classify_fully(uid: str, region_uuid: str, asset_fmt: str, region: ee.Geomet
     
     image_op = ""
     if region_uuid is not None:
-        ops = make_image_assets(uid, [classified], [asset_fmt.format(region_uuid = region_uuid)], region)
+        ops = make_image_assets(uid, [classified], [asset_fmt.format(region_uuid = region_uuid)], region, scale)
         if len(ops) > 0:
             image_op = ops[0]
     
