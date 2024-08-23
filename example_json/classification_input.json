@@ -6,6 +6,7 @@
 "char_label": "Classname",
 "palette": ["#00FF00", "#FF0000", "#0000FF"],
 "roi": {
+  "force_landsat": true,
   "region_uuid": "unique_string_1234",
   "buff_dist":2500,
   "name":"my_roi",

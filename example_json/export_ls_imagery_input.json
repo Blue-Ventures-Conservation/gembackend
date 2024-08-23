@@ -8,8 +8,8 @@
   "cont_month_end":8,
   "hist_year_start":1998,
   "hist_year_end":2001,
-  "hist_month_start":6,
-  "hist_month_end":8,
+  "hist_month_start":5,
+  "hist_month_end":9,
   "excludes": [{
     "type": "Polygon",
     "coordinates":[

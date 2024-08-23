@@ -1,57 +1,21 @@
 {
-"target_classes": ["Mangrove"],
-"combined_name": null,
-"sub_regions": [{
-  "name": "East Ambanja",
-  "geometry": {
-    "type": "Polygon",
-    "coordinates": [[
-      [
-        48.13556940356245,
-        -13.730191281214
-      ],
-      [
-        48.2097271184062,
-        -13.82355601613009
-      ],
-      [
-        48.34980280199995,
-        -13.807553284162307
-      ],
-      [
-        48.38825495043745,
-        -13.668817049848599
-      ],
-      [
-        48.28937799731245,
-        -13.634120188386785
-      ],
-      [
-        48.13556940356245,
-        -13.730191281214
-      ]
-    ]]
-  }}
-],
-"red": "FF0000",
-"green": "00FF00",
-"blue": "0000FF",
 "contemporary_storage_key": "TAB_CRA_2020_210224_binary",
 "historical_storage_key": "TAB_CRA_2000_210301_binary",
 "use_cont_spec": false,
 "num_label": "Classvalue",
 "char_label": "Classname",
+"palette": ["#00FF00", "#FF0000", "#0000FF"],
 "roi": {
-  "force_landsat": true,
-  "region_uuid": "unique_string_1234",
+  "force_landsat": false,
+  "region_uuid": "unique_string_1235",
   "buff_dist":2500,
   "name":"my_roi",
-  "cont_year_start":2019,
-  "cont_year_end":2021,
+  "cont_year_start":2022,
+  "cont_year_end":2023,
   "cont_month_start":6,
   "cont_month_end":8,
-  "hist_year_start":1998,
-  "hist_year_end":2001,
+  "hist_year_start":2019,
+  "hist_year_end":2020,
   "hist_month_start":6,
   "hist_month_end":8,
   "excludes": [{

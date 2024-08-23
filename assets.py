@@ -12,11 +12,12 @@ asset_user_shps = 'gs://{bucket}/users/{uid}/shps/{key}.zip'
 asset_user_downloads = 'users/{uid}/downloads/{name}_{slug}'
 # 47 hours x 60 min x 60 min
 asset_dl_timeout = 47 * 60 * 60
+asset_max_pixels = 1e13
 
 class MissingAsset(Exception):
     pass
 
-def make_export(uid: str, img: ee.Image, region: ee.Geometry, name: str) -> Dict[str, str]:
+def make_export(uid: str, img: ee.Image, region: ee.Geometry, name: str, scale: int) -> Dict[str, str]:
     slug = uuid.uuid4().hex
     fprefix = asset_user_downloads.format(uid = uid, name = name, slug = slug)
     bucket = asset_default_bucket.format(project_id = project.project_id)
@@ -25,8 +26,8 @@ def make_export(uid: str, img: ee.Image, region: ee.Geometry, name: str) -> Dict
         bucket = bucket,
         image = img,
         region = region,
-        scale = 30,
-        maxPixels = 1e13,
+        scale = scale,
+        maxPixels = asset_max_pixels,
     )
     task.start()
     
@@ -52,7 +53,7 @@ def make_table_export(uid: str, table: ee.FeatureCollection, selectors: List[str
         'path': fprefix + ".csv"
     }
 
-def make_image_assets(uid: str, imgs: List[ee.Image], keys: List[str], region: ee.Geometry) -> List[str]:
+def make_image_assets(uid: str, imgs: List[ee.Image], keys: List[str], region: ee.Geometry, scale: int) -> List[str]:
     if not create_user_asset_folder(uid):
         return []
     
@@ -67,8 +68,8 @@ def make_image_assets(uid: str, imgs: List[ee.Image], keys: List[str], region: e
             image = img,
             assetId = asset_id,
             region = region,
-            scale = 30,
-            maxPixels = 1e13,
+            scale = scale,
+            maxPixels = asset_max_pixels,
         )
         task.start()
         ops.append(task.status()['name'])
