@@ -113,11 +113,14 @@ def imagery_export(uid: str, vis: bool, roi: dict, buff_dist: int):
         "timeout": asset_dl_timeout
     }
 
-def should_use_s2(hist_year: int, hist_month: int) -> bool:
-    return (hist_year > s2_start_year) or (hist_year == s2_start_year and hist_month >= s2_start_month)
+def should_use_s2(cont_start_year: int, cont_start_month: int, hist_start_year: int, hist_start_month: int) -> bool:
+    return fits_s2_range(cont_start_year, cont_start_month) and fits_s2_range(hist_start_year, hist_start_month)
+
+def fits_s2_range(year: int, month: int) -> bool:
+    return (year > s2_start_year) or (year == s2_start_year and month >= s2_start_month)
 
 def get_landsat(roi: dict) -> bool:
-    return roi.get("force_landsat", True) or not should_use_s2(roi["hist_year_start"], roi["hist_month_start"])
+    return roi.get("force_landsat", True) or not should_use_s2(roi["cont_year_start"], roi["hist_month_start"], roi["hist_year_start"], roi["hist_month_start"])
 
 def get_cloud_limit(roi: dict) -> int:
     return roi.get("cloud_limit", default_cloud_limit)
