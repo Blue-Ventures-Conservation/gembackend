@@ -36,8 +36,8 @@ def dynamics_export(uid: str, region_uuid: str, target_classes: List[str], combi
         _, lmask, pmask, gmask = region_stats(True, region, class_num, classImgs, sortedValues, sortedNames, scale)
         
         lmask = lmask.visualize(palette = red)
-        pmask = pmask.visualize(palette = green)
-        gmask = gmask.visualize(palette = blue)
+        pmask = pmask.visualize(palette = blue)
+        gmask = gmask.visualize(palette = green)
         ltask = make_export(uid, lmask, region, "loss", scale)
         ptask = make_export(uid, pmask, region, "persistence", scale)
         gtask = make_export(uid, gmask, region, "gain", scale)
