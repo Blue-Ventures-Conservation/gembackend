@@ -71,8 +71,8 @@ def get_dynamics(uid: str, region_uuid: str, target_classes: List[str], combined
                 "all_classes": rstats,
             },
             "loss_url": lpg_url(lmask, red),
-            "persistence_url": lpg_url(pmask, green),
-            "gain_url": lpg_url(gmask, blue),
+            "persistence_url": lpg_url(pmask, blue),
+            "gain_url": lpg_url(gmask, green),
             "created_at": int(time.time()),
             "timeout": tile_timeout,
             "sub_region_stats": []
