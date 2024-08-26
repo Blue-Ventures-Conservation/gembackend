@@ -9,7 +9,7 @@ from assets import asset_error, make_export, make_table_export, asset_dl_timeout
 
 def dynamics_ready(uid: str, region_uuid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int, prev_cont_op: str, prev_hist_op: str):
     try:
-        cont_lazy, hist_lazy, region, _, _, scale = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
+        _, _, cont_lazy, hist_lazy, _, _, _, _, region, _, _, _, scale = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
         cont, hist, cont_op, hist_op = get_cached_imagery_or_submit(uid, region_uuid, region, prev_cont_op, prev_hist_op, cont_lazy, hist_lazy, scale)
         
         return {
@@ -96,7 +96,7 @@ def class_images(cont_class: ee.Image, hist_class: ee.Image, sortedValues: List[
     return classImgs
 
 def combine_classes(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Tuple[int, int, ee.Dictionary, ee.Image, ee.Image, ee.Geometry, List[int], List[str]]:
-    cont_class, hist_class, region, _, sorts, scale = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
+    _, _, cont_class, hist_class, _, _, _, _, region, _, sorts, _, scale = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
     cont_class, hist_class, _, _ = get_cached_imagery_or_submit(uid, region_uuid, region, None, None, cont_class, hist_class, scale)
     
     if cont_class is None or hist_class is None:
