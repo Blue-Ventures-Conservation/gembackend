@@ -336,7 +336,7 @@ def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry, s
             .select('qa').eq(50)
     
     ts = 16
-    if scale < 20:
+    if scale < 30:
         ts = 1
     def mndwi_map(img: ee.Image) -> ee.Image:
         mndwi = produce_mndwi(img)

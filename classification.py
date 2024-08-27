@@ -145,7 +145,7 @@ def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_con
     hists, _, _, _ = hist_imagery_collection(roi, buff_dist)
     hist_water = ee.ImageCollection(hists).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
 
-    fmask = final_mask(buf_excl_roi, cont_water, hist_water, scale)
+    fmask = final_mask(buf_excl_roi, cont_water, hist_water)
 
     chot, clot, _ = mosaic_indices(conts, buf_excl_roi, indices, scale)
     hhot, hlot, _ = mosaic_indices(hists, buf_excl_roi, indices, scale)
@@ -239,9 +239,9 @@ def classify_fully(image_op: str, classified: ee.Image, classifier: ee.Classifie
         "image_op": image_op,
     }
 
-def final_mask(region: ee.Geometry, clot: ee.Image, hlot: ee.Image, scale: int) -> ee.Image:
+def final_mask(region: ee.Geometry, clot: ee.Image, hlot: ee.Image) -> ee.Image:
     mangs = known_mangroves().clip(region)
-    tmask = topo_mask(topo_dsm(), scale, mangs)
+    tmask = topo_mask(topo_dsm(), mangs)
     
     mndwi_cont = produce_mndwi(clot).lt(0.09)
     ndwi_cont = produce_ndwi(clot).lt(0.20)
@@ -262,11 +262,11 @@ def topo_dsm() -> ee.Image:
     slp_img = ee.Terrain.slope(ee.Image(dsm).select("elev")).double().rename("slope")
     return dsm.addBands(slp_img)
 
-def topo_mask(dsm: ee.Image, scale: int, mangs: ee.Image) -> ee.Image:
+def topo_mask(dsm: ee.Image, mangs: ee.Image) -> ee.Image:
     mang_elv = dsm.select('elev').updateMask(mangs).reduceRegion(
             reducer = ee.Reducer.percentile(percentiles = [99]),
             geometry = mangs.geometry(),
-            scale = scale,
+            scale = 30,
             maxPixels = topo_max_pixels,
             bestEffort = True
     )
@@ -274,7 +274,7 @@ def topo_mask(dsm: ee.Image, scale: int, mangs: ee.Image) -> ee.Image:
     mang_slope = dsm.select('slope').updateMask(mangs).reduceRegion(
             reducer = ee.Reducer.percentile(percentiles = [99]),
             geometry = mangs.geometry(),
-            scale = scale,
+            scale = 30,
             maxPixels = topo_max_pixels,
             bestEffort = True
     )
