@@ -12,8 +12,9 @@ mangroves_max_pixels = 1e13
 
 def known_mangroves() -> ee.Image:
     giri = ee.ImageCollection("LANDSAT/MANGROVE_FORESTS").mean()
+    gmw2020 = ee.ImageCollection("projects/sat-io/open-datasets/GMW/annual-extent/GMW_MNG_2020").mean()
     gmw = ee.Image("projects/earthengine-legacy/assets/projects/sat-io/open-datasets/GMW/union/gmw_v3_mng_union")
-    return giri.blend(gmw)
+    return giri.blend(gmw).blend(gmw2020)
 
 # poly here should be the dict equivalent of a geojson polygon
 def coastline(roi_poly: ee.Geometry) -> ee.Geometry:
