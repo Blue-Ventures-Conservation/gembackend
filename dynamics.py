@@ -226,25 +226,37 @@ def maskArea(mask: ee.Image, geo: ee.Geometry, scale: int) -> ee.Number:
             bestEffort = True,
     ).get("area")).round()
 
+def percentage(num: float, denom: float) -> str:
+    return str(round(num/denom * 1e4)/1e2) + "%"
+
 def region_csv_stats(region_name: str, geo: ee.Geometry, class_num: int, classImgs: ee.Dictionary, sortedValues: List[int], sortedNames: List[str], scale: int) -> Tuple[List[ee.Feature], List[str]]:
     csv_stats = []
     api_stats, _, _, _ = region_stats(False, geo, class_num, classImgs, sortedValues, sortedNames, scale)
     for stats in api_stats:
         convDat, selectors = conversionData(stats["conversions"], sortedNames)
+        histArea = round(stats["hist"]/10)/1e3
+        contArea = round(stats["cont"]/10)/1e3
+        lossArea = round(stats["loss"]/10)/1e3
+        persArea = round(stats["persistence"]/10)/1e3
+        gainArea = round(stats["gain"]/10)/1e3
         data = {
                 "Region": region_name,
                 "Class": stats["name"],
-                "Contemporary": round(stats["cont"]/10)/1e3,
-                "Historical": round(stats["hist"]/10)/1e3,
-                "Loss": round(stats["loss"]/10)/1e3,
-                "Persistence": round(stats["persistence"]/10)/1e3,
-                "Gain": round(stats["gain"]/10)/1e3,
+                "Historical": histArea,
+                "Contemporary": contArea,
+                "PercentChange": percentage((histArea - contArea), contArea),
+                "Loss": lossArea,
+                "PercentLoss": percentage(lossArea, histArea),
+                "Persistence": persArea,
+                "PercentPersistence": percentage(persArea, histArea),
+                "Gain": gainArea,
+                "PercentGain": percentage(gainArea, histArea),
         }
         data.update(convDat)
         # the geometry here is just a placeholder, we will export the CSV without it
         csv_stats.append(ee.Feature(ee.Geometry.Point([0,0]), data))
     
-    return csv_stats, ["Region", "Class", "Historical", "Contemporary", "Loss", "Persistence", "Gain"] + selectors
+    return csv_stats, ["Region", "Class", "Historical", "Contemporary", "PercentChange", "Loss", "PercentLoss", "Persistence", "PercentPersistence",  "Gain", "PercentGain"] + selectors
 
 def conversionData(conv: Dict[str, List[dict]], sortedNames: List[str]) -> Tuple[dict, List[str]]:
     dat = {}
