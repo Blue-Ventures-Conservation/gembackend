@@ -30,7 +30,6 @@ s2_scale = 10
 s2_qa_pixel = "QA60"
 s2_cloud_property = "CLOUDY_PIXEL_PERCENTAGE"
 s2_bands = ['B2','B3','B4','B8','B11','B12']
-s2_cloudscore_band = 'cs_cdf'
 
 # temp names used for calculating spectral indices
 optical_bands = ['B1','B2','B3','B4','B5','B7']
@@ -113,14 +112,38 @@ def imagery_export(uid: str, vis: bool, roi: dict, buff_dist: int):
         "timeout": asset_dl_timeout
     }
 
-def should_use_s2(cont_start_year: int, cont_start_month: int, hist_start_year: int, hist_start_month: int) -> bool:
-    return fits_s2_range(cont_start_year, cont_start_month) and fits_s2_range(hist_start_year, hist_start_month)
+def should_use_s2(cont_start_year: int, cont_months: List[int], hist_start_year: int, hist_months: List[int]) -> bool:
+    return fits_s2_range(cont_start_year, cont_months) and fits_s2_range(hist_start_year, hist_months)
 
-def fits_s2_range(year: int, month: int) -> bool:
-    return (year > s2_start_year) or (year == s2_start_year and month >= s2_start_month)
+def fits_s2_range(year: int, months: List[int]) -> bool:
+    finalYearMaxLen = 13 - s2_start_month
+    return (year > s2_start_year) or (year == s2_start_year and (len(months) >= finalYearMaxLen and months[0] >= s2_start_month))
 
-def get_landsat(roi: dict) -> bool:
-    return roi.get("force_landsat", True) or not should_use_s2(roi["cont_year_start"], roi["cont_month_start"], roi["hist_year_start"], roi["hist_month_start"])
+def get_roi_months(roi: dict) -> Tuple[List[int], List[int]]:
+    if "cont_months" in roi and "hist_months" in roi:
+        return roi["cont_months"], roi["hist_months"]
+    
+    return get_months_from_range(roi["cont_month_start"], roi["cont_month_end"]), get_months_from_range(roi["hist_month_start"], roi["hist_month_end"])
+
+def get_months_from_range(month_start: int, month_end: int) -> List[int]:
+    months = []
+    start = month_start
+    end = month_end
+    
+    if end > start:
+        for x in range(1, month_start):
+            months.append(x)
+        
+        for y in range(month_end, 12):
+            months.append(y)
+    else: 
+        for n in range(month_start, month_end):
+            months.append(n)
+    
+    return months
+
+def should_landsat(roi: dict, cont_months: List[int], hist_months: List[int]) -> bool:
+    return roi.get("force_landsat", True) or not should_use_s2(roi["cont_year_start"], cont_months, roi["hist_year_start"], hist_months)
 
 def get_cloud_limit(roi: dict) -> int:
     return roi.get("cloud_limit", default_cloud_limit)
@@ -129,18 +152,22 @@ def get_tidal_zone(roi: dict) -> int:
     return roi.get("tidal_zone", default_tidal_zone)
 
 def cont_imagery(roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, int]:
-    return get_imagery(get_landsat(roi), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), get_tidal_zone(roi), roi.get("excludes", []), roi["cont_year_start"], roi["cont_year_end"], roi["cont_month_start"], roi["cont_month_end"])
+    cont_months, hist_months = get_roi_months(roi)
+    return get_imagery(should_landsat(roi, cont_months, hist_months), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), get_tidal_zone(roi), roi.get("excludes", []), roi["cont_year_start"], roi["cont_year_end"], cont_months)
  
 def hist_imagery(roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, int]:
-    return get_imagery(get_landsat(roi), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), get_tidal_zone(roi), roi.get("excludes", []), roi["hist_year_start"], roi["hist_year_end"], roi["hist_month_start"], roi["hist_month_end"])
+    cont_months, hist_months = get_roi_months(roi)
+    return get_imagery(should_landsat(roi, cont_months, hist_months), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), get_tidal_zone(roi), roi.get("excludes", []), roi["hist_year_start"], roi["hist_year_end"], hist_months)
 
 def cont_imagery_collection(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.Geometry, List[str], int]:
-    return get_imagery_collection(get_landsat(roi), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), get_tidal_zone(roi), roi.get("excludes", []), roi["cont_year_start"], roi["cont_year_end"], roi["cont_month_start"], roi["cont_month_end"])
+    cont_months, hist_months = get_roi_months(roi)
+    return get_imagery_collection(should_landsat(roi, cont_months, hist_months), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), get_tidal_zone(roi), roi.get("excludes", []), roi["cont_year_start"], roi["cont_year_end"], cont_months)
 
 def hist_imagery_collection(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.Geometry, List[str], int]:
-    return get_imagery_collection(get_landsat(roi), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), get_tidal_zone(roi), roi.get("excludes", []), roi["hist_year_start"], roi["hist_year_end"], roi["hist_month_start"], roi["hist_month_end"])
+    cont_months, hist_months = get_roi_months(roi)
+    return get_imagery_collection(should_landsat(roi, cont_months, hist_months), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), get_tidal_zone(roi), roi.get("excludes", []), roi["hist_year_start"], roi["hist_year_end"], hist_months)
 
-def get_imagery_collection(landsat: bool, buff_dist: int, indices: List[str], poly: dict, cloud_limit: int, tidal_zone: int, excludes: List[dict], year1: int, year2: int, month1: int, month2: int) -> Tuple[ee.ImageCollection, ee.Geometry, List[str], int]:
+def get_imagery_collection(landsat: bool, buff_dist: int, indices: List[str], poly: dict, cloud_limit: int, tidal_zone: int, excludes: List[dict], year1: int, year2: int, months: List[int]) -> Tuple[ee.ImageCollection, ee.Geometry, List[str], int]:
     roi = ee.Geometry(poly)
     coast = coastline(roi)
     buffered_roi_poly = coast.buffer(buff_dist).intersection(roi)
@@ -149,20 +176,20 @@ def get_imagery_collection(landsat: bool, buff_dist: int, indices: List[str], po
     images = None
     scale = None
     if landsat == True:
-        images = get_landsat_imagery(buffered_roi_poly, cloud_limit, year1, year2, month1, month2, zone, excludes)
+        images = get_landsat_imagery(buffered_roi_poly, cloud_limit, year1, year2, months, zone, excludes)
         scale = ls_scale
     else:
-        images = get_sentinel2_imagery(buffered_roi_poly, cloud_limit, year1, year2, month1, month2, zone, excludes)
+        images = get_sentinel2_imagery(buffered_roi_poly, cloud_limit, year1, year2, months, zone, excludes)
         scale = s2_scale
     
     return images, buffered_roi_poly, indices, scale
 
-def get_landsat_imagery(buffered_roi: ee.Geometry, cloud_limit: int, year1: int, year2: int, month1: int, month2: int, tidal_zone: ee.Geometry, excludes: List[dict]) -> ee.ImageCollection:
-    ls4 = ls4_imagery(buffered_roi, cloud_limit, year1, year2, month1, month2)
-    ls5 = ls5_imagery(buffered_roi, cloud_limit, year1, year2, month1, month2)
-    ls7 = ls7_imagery(buffered_roi, cloud_limit, year1, year2, month1, month2)
-    ls8 = ls8_imagery(buffered_roi, cloud_limit, year1, year2, month1, month2)
-    ls9 = ls9_imagery(buffered_roi, cloud_limit, year1, year2, month1, month2)
+def get_landsat_imagery(buffered_roi: ee.Geometry, cloud_limit: int, year1: int, year2: int, months: List[int], tidal_zone: ee.Geometry, excludes: List[dict]) -> ee.ImageCollection:
+    ls4 = ls4_imagery(buffered_roi, cloud_limit, year1, year2, months)
+    ls5 = ls5_imagery(buffered_roi, cloud_limit, year1, year2, months)
+    ls7 = ls7_imagery(buffered_roi, cloud_limit, year1, year2, months)
+    ls8 = ls8_imagery(buffered_roi, cloud_limit, year1, year2, months)
+    ls9 = ls9_imagery(buffered_roi, cloud_limit, year1, year2, months)
     
     renames = ee.List(optical_bands).cat([ls_tir_rename, ls_qa_pixel])
     
@@ -188,8 +215,8 @@ def get_landsat_imagery(buffered_roi: ee.Geometry, cloud_limit: int, year1: int,
     imgs = tide_bands(shore_refl(imgs, tidal_zone, buffered_roi, ls_scale))
     return imgs.map(ls_cloud_mask)
 
-def get_sentinel2_imagery(buffered_roi: ee.Geometry, cloud_limit: int, year1: int, year2: int, month1: int, month2: int, tidal_zone: ee.Geometry, excludes: List[dict]) -> ee.ImageCollection:
-    s2 = sentinel2_imagery(buffered_roi, cloud_limit, year1, year2, month1, month2)
+def get_sentinel2_imagery(buffered_roi: ee.Geometry, cloud_limit: int, year1: int, year2: int, months: List[int], tidal_zone: ee.Geometry, excludes: List[dict]) -> ee.ImageCollection:
+    s2 = sentinel2_imagery(buffered_roi, cloud_limit, year1, year2, months)
     
     for exclude in excludes:
         buffered_roi = buffered_roi.difference(exclude)
@@ -199,8 +226,8 @@ def get_sentinel2_imagery(buffered_roi: ee.Geometry, cloud_limit: int, year1: in
     imgs = tide_bands(shore_refl(imgs, tidal_zone, buffered_roi, s2_scale))
     return s2_cloud_mask(imgs)
 
-def get_imagery(landsat: bool, buff_dist: int, indices: List[str], poly: dict, cloud_limit: int, tidal_zone: int, excludes: List[dict], year1: int, year2: int, month1: int, month2: int) -> Tuple[ee.Image, ee.Image, int]:
-    imgs, buf_excl_roi, indices, scale = get_imagery_collection(landsat, buff_dist, indices, poly, cloud_limit, tidal_zone, excludes, year1, year2, month1, month2)
+def get_imagery(landsat: bool, buff_dist: int, indices: List[str], poly: dict, cloud_limit: int, tidal_zone: int, excludes: List[dict], year1: int, year2: int, months: List[int]) -> Tuple[ee.Image, ee.Image, int]:
+    imgs, buf_excl_roi, indices, scale = get_imagery_collection(landsat, buff_dist, indices, poly, cloud_limit, tidal_zone, excludes, year1, year2, months)
     return mosaic_indices(imgs, buf_excl_roi, indices, scale)
 
 def mosaic_indices(imgs: ee.ImageCollection, buffered_excluded_roi: ee.Geometry, indices: List[str], scale: int) -> Tuple[ee.Image, ee.Image, int]:
@@ -234,31 +261,30 @@ def mosaic_indices(imgs: ee.ImageCollection, buffered_excluded_roi: ee.Geometry,
     
     return high_tide.float(), low_tide.float(), scale
 
-def sentinel2_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: int, month1: int, month2: int) -> ee.ImageCollection:
-    return filter_collection(s2_dataset, poly, s2_cloud_property, cloud_limit, year1, year2, month1, month2)
+def sentinel2_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: int, months: List[int]) -> ee.ImageCollection:
+    return filter_collection(s2_dataset, poly, s2_cloud_property, cloud_limit, year1, year2, months)
 
 def s2_scale_factors(img: ee.Image) -> ee.Image:
     optics = img.select(optical_bands).divide(10000)
     return img.addBands(optics, None, True)
 
 def s2_cloud_mask(imgs: ee.ImageCollection) -> ee.ImageCollection:
-    return imgs.linkCollection(ee.ImageCollection('GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED'), [s2_cloudscore_band]).map(s2_cloud_filter)
+    return imgs.linkCollection(ee.ImageCollection('GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED'), ['cs_cdf', 'cs']).map(s2_cloud_filter)
 
 def s2_cloud_filter(img: ee.Image) -> ee.Image:
-    return img.updateMask(img.select(s2_cloudscore_band).gte(0.85))
+    return img.updateMask(img.select('cs_cdf').gte(0.70).And(img.select('cs').gte(0.70)))
 
-def ls4_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: int, month1: int, month2: int) -> ee.ImageCollection:
-    return filter_collection(ls4_dataset, poly, ls_cloud_property, cloud_limit, year1, year2, month1, month2)
+def ls4_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: int, months: List[int]) -> ee.ImageCollection:
+    return filter_collection(ls4_dataset, poly, ls_cloud_property, cloud_limit, year1, year2, months)
 
-def ls5_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: int, month1: int, month2: int) -> ee.ImageCollection:
-    return filter_collection(ls5_dataset, poly, ls_cloud_property, cloud_limit, year1, year2, month1, month2)
+def ls5_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: int, months: List[int]) -> ee.ImageCollection:
+    return filter_collection(ls5_dataset, poly, ls_cloud_property, cloud_limit, year1, year2, months)
 
-def ls7_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: int, month1: int, month2: int) -> ee.ImageCollection:
-    justMay = month1 == 5 and month2 == 5
-    normal = month1 < month2
-    wrapping = month1 > month2
-    monthRangeOverlaps = (wrapping and month1 <= 5) or (wrapping and month2 >= 5) or (normal and (month1 <= 5))
-    monthsOverlap = justMay or monthRangeOverlaps
+def ls7_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: int, months: List[int]) -> ee.ImageCollection:
+    if len(months) <= 0:
+        return ee.ImageCollection([])
+    
+    monthsOverlap = months[0] <= 5
     overlaps = year1 < 2003 or (year1 == 2003 and monthsOverlap)
     if not overlaps:
         return ee.ImageCollection([])
@@ -270,33 +296,40 @@ def ls7_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: int, mon
     if truncate:
         fullYears = ee.ImageCollection([])
         if year1 < 2003:
-            fullYears = ls7.filterDate(f'{year1}-01-01', f'2003-01-01') \
-                    .filter(ee.Filter.calendarRange(month1, month2, "month"))
+            fullYears = ls7.filterDate(f'{year1}-01-01', f'2003-01-01')
 
-        truncated = ls7.filterDate(f'2003-01-01', f'2003-05-30') \
-                .filter(ee.Filter.calendarRange(month1, 5, "month"))
+        truncated = ls7.filterDate(f'2003-01-01', f'2003-05-30')
 
         dateFiltered = truncated.merge(fullYears)
     else:
         y2 = year2 + 1
-        dateFiltered = ls7.filterDate(f'{year1}-01-01', f'{y2}-01-01') \
-                    .filter(ee.Filter.calendarRange(month1, month2, "month"))
+        dateFiltered = ls7.filterDate(f'{year1}-01-01', f'{y2}-01-01')
     
-    return dateFiltered.filterBounds(poly) \
+    images = dateFiltered.filterBounds(poly) \
         .filterMetadata("CLOUD_COVER", "not_greater_than", cloud_limit)
+    
+    return filter_months(images, months)
 
-def ls8_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: int, month1: int, month2: int) -> ee.ImageCollection:
-    return filter_collection(ls8_dataset, poly, ls_cloud_property, cloud_limit, year1, year2, month1, month2)
+def ls8_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: int, months: List[int]) -> ee.ImageCollection:
+    return filter_collection(ls8_dataset, poly, ls_cloud_property, cloud_limit, year1, year2, months)
 
-def ls9_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: int, month1: int, month2: int) -> ee.ImageCollection:
-    return filter_collection(ls9_dataset, poly, ls_cloud_property, cloud_limit, year1, year2, month1, month2)
+def ls9_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: int, months: List[int]) -> ee.ImageCollection:
+    return filter_collection(ls9_dataset, poly, ls_cloud_property, cloud_limit, year1, year2, months)
 
-def filter_collection(dataset: str, poly: ee.Geometry, cloud_property: str, cloud_limit: int, year1: int, year2: int, month1: int, month2: int) -> ee.ImageCollection:
+def filter_months(images: ee.ImageCollection, months: List[int]) -> ee.ImageCollection:
+    filters = []
+    for month in months:
+        filters.append(ee.Filter.calendarRange(month, month, 'month'))
+    
+    return images.filter(ee.Filter.Or(*filters))
+
+def filter_collection(dataset: str, poly: ee.Geometry, cloud_property: str, cloud_limit: int, year1: int, year2: int, months: List[int]) -> ee.ImageCollection:
     y2 = year2 + 1
-    return ee.ImageCollection(dataset).filterBounds(poly) \
+    images = ee.ImageCollection(dataset).filterBounds(poly) \
         .filterMetadata(cloud_property, "not_greater_than", cloud_limit) \
-        .filterDate(f'{year1}-01-01', f'{y2}-01-01') \
-        .filter(ee.Filter.calendarRange(month1, month2, "month")) # handles wrapping if month1 < month2
+        .filterDate(f'{year1}-01-01', f'{y2}-01-01')
+    
+    return filter_months(images, months)
  
 def etm_to_oli(img: ee.Image) -> ee.Image:
     itcps = ee.Image.constant([0.0003, 0.0088, 0.0061, 0.0412, 0.0254, 0.0172]).multiply(10000)

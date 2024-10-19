@@ -137,16 +137,14 @@ def combined_classification_lazy(uid: str, cont_key: str, hist_key: str, use_con
 def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry, ee.Geometry, ee.Geometry, ee.List, int]:
     min_avg = default_min_avg
     conts, buf_excl_roi, indices, scale = cont_imagery_collection(roi, buff_dist)
-    if scale < 30:
-        min_avg = 0.75
-
+    
     cont_water = ee.ImageCollection(conts).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
-
+    
     hists, _, _, _ = hist_imagery_collection(roi, buff_dist)
     hist_water = ee.ImageCollection(hists).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
-
+    
     fmask = final_mask(buf_excl_roi, cont_water, hist_water)
-
+    
     chot, clot, _ = mosaic_indices(conts, buf_excl_roi, indices, scale)
     hhot, hlot, _ = mosaic_indices(hists, buf_excl_roi, indices, scale)
     chot = chot.updateMask(fmask)

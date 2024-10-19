@@ -3,12 +3,10 @@
   "name":"my_roi",
   "cont_year_start":2019,
   "cont_year_end":2021,
-  "cont_month_start":6,
-  "cont_month_end":8,
+  "cont_months": [6,7,8],
   "hist_year_start":1998,
   "hist_year_end":2001,
-  "hist_month_start":6,
-  "hist_month_end":8,
+  "hist_months": [6,7,8],
   "excludes": [{
     "type": "Polygon",
     "coordinates":[
