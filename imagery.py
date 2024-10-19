@@ -127,10 +127,8 @@ def get_roi_months(roi: dict) -> Tuple[List[int], List[int]]:
 
 def get_months_from_range(month_start: int, month_end: int) -> List[int]:
     months = []
-    start = month_start
-    end = month_end
     
-    if end > start:
+    if month_end > month_start:
         for x in range(1, month_start):
             months.append(x)
         
