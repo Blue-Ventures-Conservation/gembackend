@@ -174,13 +174,13 @@ def get_imagery_collection(landsat: bool, buff_dist: int, indices: List[str], po
     images = None
     scale = None
     if landsat == True:
-        images = get_landsat_imagery(buffered_roi_poly, cloud_limit, year1, year2, months, zone, excludes)
+        images, excluded_roi = get_landsat_imagery(buffered_roi_poly, cloud_limit, year1, year2, months, zone, excludes)
         scale = ls_scale
     else:
-        images = get_sentinel2_imagery(buffered_roi_poly, cloud_limit, year1, year2, months, zone, excludes)
+        images, excluded_roi = get_sentinel2_imagery(buffered_roi_poly, cloud_limit, year1, year2, months, zone, excludes)
         scale = s2_scale
     
-    return images, buffered_roi_poly, indices, scale
+    return images, excluded_roi, indices, scale
 
 def get_landsat_imagery(buffered_roi: ee.Geometry, cloud_limit: int, year1: int, year2: int, months: List[int], tidal_zone: ee.Geometry, excludes: List[dict]) -> ee.ImageCollection:
     ls4 = ls4_imagery(buffered_roi, cloud_limit, year1, year2, months)
@@ -211,7 +211,7 @@ def get_landsat_imagery(buffered_roi: ee.Geometry, cloud_limit: int, year1: int,
     swir1 = ee.String(optical_bands[4])
     imgs = clamp_band(imgs.map(ls_scale_factors).map(fix_float), swir1, renames)
     imgs = tide_bands(shore_refl(imgs, tidal_zone, buffered_roi, ls_scale))
-    return imgs.map(ls_cloud_mask)
+    return imgs.map(ls_cloud_mask), buffered_roi
 
 def get_sentinel2_imagery(buffered_roi: ee.Geometry, cloud_limit: int, year1: int, year2: int, months: List[int], tidal_zone: ee.Geometry, excludes: List[dict]) -> ee.ImageCollection:
     s2 = sentinel2_imagery(buffered_roi, cloud_limit, year1, year2, months)
@@ -222,7 +222,7 @@ def get_sentinel2_imagery(buffered_roi: ee.Geometry, cloud_limit: int, year1: in
     renames = ee.List(optical_bands).add(s2_qa_pixel)
     imgs = ee.ImageCollection(s2).select(ee.List(s2_bands).add(s2_qa_pixel), renames).map(s2_scale_factors)
     imgs = tide_bands(shore_refl(imgs, tidal_zone, buffered_roi, s2_scale))
-    return s2_cloud_mask(imgs)
+    return s2_cloud_mask(imgs), buffered_roi
 
 def get_imagery(landsat: bool, buff_dist: int, indices: List[str], poly: dict, cloud_limit: int, tidal_zone: int, excludes: List[dict], year1: int, year2: int, months: List[int]) -> Tuple[ee.Image, ee.Image, int]:
     imgs, buf_excl_roi, indices, scale = get_imagery_collection(landsat, buff_dist, indices, poly, cloud_limit, tidal_zone, excludes, year1, year2, months)
