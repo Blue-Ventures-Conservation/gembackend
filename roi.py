@@ -58,12 +58,16 @@ def area_chart(poly: dict, excludes: List[dict]) -> Dict[str, dict]:
         .addBands(ee.Image.pixelArea().updateMask(mang.clip(clipGeom(coast, 15000))).rename(['15'])) \
         .addBands(ee.Image.pixelArea().updateMask(mang.clip(clipGeom(coast, 20000))).rename(['20']))
     
-    bands = mangrove_buff.bandNames().slice(1, 9)
+    bands = mangrove_buff.bandNames().slice(1, 7)
     mangrove_buff = mangrove_buff.select(bands)
+
+    geom = roi
+    for excl in excludeGeoms:
+        geom = geom.difference(excl)
     
     sums = mangrove_buff.reduceRegion(
         reducer = ee.Reducer.sum(),
-        geometry = roi,
+        geometry = geom,
         scale = mangroves_scale,
         maxPixels = mangroves_max_pixels,
         bestEffort = True
