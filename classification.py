@@ -156,10 +156,10 @@ def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_con
     
     ct_poly = training_poly(uid, cont_key, num_label)
     ht_poly = training_poly(uid, hist_key, num_label)
-    cont_sample = sample_image(cont_combo, ct_poly, [num_label, char_label, "ID"], scale, True)
+    cont_sample = sample_image(cont_combo, ct_poly, [num_label, char_label, "ID_Numeric", "id_numeric", "ID", "id"], scale, True)
     hist_sample = cont_sample
     if not use_cont_spec:
-        hist_sample = sample_image(hist_combo, ht_poly, [num_label, char_label, "ID"], scale, True)
+        hist_sample = sample_image(hist_combo, ht_poly, [num_label, char_label, "ID_Numeric", "id_numeric", "ID", "id"], scale, True)
     
     expanded_colors = ee.List([])
     if palette is not None:

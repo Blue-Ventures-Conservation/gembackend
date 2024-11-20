@@ -39,7 +39,7 @@ def scatter_chart_data(uid: str, key: str, num_label: str, char_label: str, img:
     bands = img.bandNames()
     cbands = bands.add(char_label)
     tpoly = training_poly(uid, key, num_label)
-    sample = sample_image(img, tpoly, [num_label, char_label, "ID"], scale, False)
+    sample = sample_image(img, tpoly, [num_label, char_label, "ID_Numeric", "id_numeric", "ID", "id"], scale, False)
     zprops = zipped_props(sample, num_label, char_label)
     
     def round_props(feat: ee.Feature) -> ee.Feature:
