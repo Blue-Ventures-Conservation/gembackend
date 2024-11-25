@@ -3,7 +3,7 @@ import time
 from typing import Callable, Dict, List, Tuple
 from project import tile_timeout
 from assets import make_export, asset_dl_timeout
-from roi import coastline
+from roi import coastline, best_buffer
 
 default_cloud_limit = 15  # percent
 default_tidal_zone = 1000 # meters
@@ -47,6 +47,9 @@ class NoHistoricalImages(Exception):
     pass
 
 def visualize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
+    if buff_dist <= 0:
+        buff_dist = best_buffer(roi["polygon"], roi["excludes"])
+    
     try:
         hhot, hlot, _ = hist_imagery(roi, buff_dist)
     except NoImages:
@@ -67,6 +70,7 @@ def visualize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
         "clot_url": clot_url,
         "hhot_url": hhot_url,
         "hlot_url": hlot_url,
+        "buff_dist": buff_dist,
         "created_at": int(time.time()),
         "timeout": tile_timeout
     }

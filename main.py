@@ -88,6 +88,7 @@ def await_table_upload_route(uid: str):
     success = await_asset(uid, content["key"], content["name"])
     return jsonify({'success': success})
 
+# deprecated
 @app.route("/area_chart", methods=["POST"])
 @token_check
 def area_chart_route():
@@ -95,6 +96,7 @@ def area_chart_route():
     chart_data = area_chart(content["polygon"], content["excludes"])
     return jsonify(chart_data)
 
+# deprecated
 @app.route("/ls_imagery", methods=["POST"])
 @token_check
 def ls_imagery_route():
@@ -112,12 +114,13 @@ def ls_imagery_route():
 def get_imagery_route():
     try:
         content = request.json
-        visuals = visualize_imagery(content, content["buff_dist"])
+        visuals = visualize_imagery(content, content.get("buff_dist", -1))
     except Exception as e:
         return "", error_check("/get_imagery", content, e)
     
     return jsonify(visuals)
 
+# deprecated
 @app.route("/export_ls_imagery", methods=["POST"])
 @token_check
 def export_ls_imagery(uid: str):
