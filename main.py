@@ -78,7 +78,8 @@ def hello_world():
 def upload_table_route(uid: str):
     content = request.json
     key = content["key"]
-    name, success = upload_table_asset(uid, key)
+    overwrite = content.get("overwrite", False)
+    name, success = upload_table_asset(uid, key, overwrite)
     return jsonify({'key': key, 'success': success, 'name': name})
 
 @app.route("/await_cra_upload", methods=["POST"])

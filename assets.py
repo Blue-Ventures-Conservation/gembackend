@@ -101,14 +101,18 @@ def create_user_asset_folder(uid: str) -> bool:
         else:
             return False
 
-def upload_table_asset(uid: str, key: str) -> Tuple[str, bool]:
+def upload_table_asset(uid: str, key: str, overwrite: bool) -> Tuple[str, bool]:
     if not create_user_asset_folder(uid):
         return "", False
-
+    
     name = asset_name(uid, key)
-    if asset_exists(name):
+    exists = asset_exists(name)
+    if exists and not overwrite:
         return "", True
-
+    
+    if exists and overwrite and not delete_asset(name):
+        return "", False
+    
     try:
         shp = asset_user_shps.format(bucket = asset_default_bucket.format(project_id=project.project_id), uid = uid, key = key)
         result = ee.data.startTableIngestion(request_id = ee.data.newTaskId()[0], params = {'name': name, 'sources': [{'uris': [shp], 'charset': 'UTF-8'}]})
@@ -171,3 +175,10 @@ def folder_exists(path: str) -> bool:
 
 def asset_name(uid: str, key: str) -> str:
     return asset_users_table_path.format(project_id=project.project_id, uid = uid, key = key)
+
+def delete_asset(name: str) -> bool:
+    try:
+        ee.data.deleteAsset(name)
+        return True
+    except:
+        return False
