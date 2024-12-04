@@ -16,6 +16,9 @@ def known_mangroves() -> ee.Image:
     gmw = ee.Image("projects/earthengine-legacy/assets/projects/sat-io/open-datasets/GMW/union/gmw_v3_mng_union")
     return giri.blend(gmw).blend(gmw2020)
 
+def geo_coords(geo: ee.Geometry) -> List[list]:
+    return ee.Geometry(geo).coordinates()
+
 # poly here should be the dict equivalent of a geojson polygon
 def coastline(roi_poly: ee.Geometry) -> ee.Geometry:
     mainlands = ee.FeatureCollection('projects/sat-io/open-datasets/shoreline/mainlands')
@@ -25,7 +28,7 @@ def coastline(roi_poly: ee.Geometry) -> ee.Geometry:
     area = mainlands.merge(big_islands).merge(small_islands).filterBounds(roi_poly)
 
     # convert the geometries to a coordinate list
-    area_coords = ee.Geometry.MultiPolygon(area.geometry().geometries()).dissolve().coordinates().flatten()
+    area_coords = area.geometry().geometries().map(geo_coords).flatten()
     # use the coordinates to create a sting geometry
     area_point = ee.Geometry.MultiPoint(area_coords)
     
