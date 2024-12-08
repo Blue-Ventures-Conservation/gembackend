@@ -26,11 +26,45 @@ def coastline(roi_poly: ee.Geometry) -> ee.Geometry:
     small_islands = ee.FeatureCollection('projects/sat-io/open-datasets/shoreline/small_islands')
     # use the roi to clip the world boundary polygons
     area = mainlands.merge(big_islands).merge(small_islands).filterBounds(roi_poly)
-
-    # convert the geometries to a coordinate list
-    area_coords = area.geometry().geometries().map(geo_coords).flatten()
+    
+    # max edges for simplify is 2,000,000
+    # we divide by twenty, because to split the coordinates up
+    # we will have to create variables and call ee.List.slice()
+    # which requires knowing the indices for the sublists
+    # we could divide by 2,000,000, but we wouldn't know how many
+    # variables to use, and I can't think of a way to push the slicing
+    # logic onto the backend, so we'd have to ask for the number to be
+    # sent to the frontend and do a loop, and that size() call is slow
+    # so twenty is chosen which should be enough hopefully to divide
+    # the data up below that number of edges for any one simplify call
+    area_coords = ee.Geometry.MultiPoint(area.geometry().geometries().map(geo_coords).flatten()).coordinates()
+    
+    twentieth = area_coords.size().divide(20).int().add(1)
+    
+    simp = 200
+    s1 = ee.Geometry.LineString(area_coords.slice(0, twentieth)).simplify(simp).coordinates()
+    s2 = ee.Geometry.LineString(area_coords.slice(twentieth, twentieth.multiply(2))).simplify(simp).coordinates()
+    s3 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(2), twentieth.multiply(3))).simplify(simp).coordinates()
+    s4 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(3), twentieth.multiply(4))).simplify(simp).coordinates()
+    s5 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(4), twentieth.multiply(5))).simplify(simp).coordinates()
+    s6 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(5), twentieth.multiply(6))).simplify(simp).coordinates()
+    s7 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(6), twentieth.multiply(7))).simplify(simp).coordinates()
+    s8 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(7), twentieth.multiply(8))).simplify(simp).coordinates()
+    s9 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(8), twentieth.multiply(9))).simplify(simp).coordinates()
+    s10 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(9), twentieth.multiply(10))).simplify(simp).coordinates()
+    s11 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(10), twentieth.multiply(11))).simplify(simp).coordinates()
+    s12 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(11), twentieth.multiply(12))).simplify(simp).coordinates()
+    s13 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(12), twentieth.multiply(13))).simplify(simp).coordinates()
+    s14 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(13), twentieth.multiply(14))).simplify(simp).coordinates()
+    s15 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(14), twentieth.multiply(15))).simplify(simp).coordinates()
+    s16 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(15), twentieth.multiply(16))).simplify(simp).coordinates()
+    s17 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(16), twentieth.multiply(17))).simplify(simp).coordinates()
+    s18 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(17), twentieth.multiply(18))).simplify(simp).coordinates()
+    s19 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(18), twentieth.multiply(19))).simplify(simp).coordinates()
+    s20 = ee.Geometry.LineString(area_coords.slice(twentieth.multiply(19), twentieth.multiply(20))).simplify(simp).coordinates()
+    
     # use the coordinates to create a sting geometry
-    area_point = ee.Geometry.MultiPoint(area_coords)
+    area_point = ee.Geometry.MultiPoint(ee.List([s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, s16, s17, s18, s19, s20]).flatten())
     
     # select points in roi and convert to coordinate list
     return area_point.intersection(roi_poly, ee.ErrorMargin(1))
@@ -64,7 +98,7 @@ def area_chart(poly: dict, excludes: List[dict]) -> Dict[str, dict]:
         
         return buffed.intersection(roi)
     
-    coast = coastline(roi).simplify(1000)
+    coast = coastline(roi)
     # create an image collection of various buffered mangroves, using the distance list
     mangrove_buff = ee.Image(0) \
         .addBands(ee.Image.pixelArea().updateMask(mang.clip(clipGeom(coast, 1000))).rename(['1'])) \
