@@ -8,7 +8,7 @@
 "roi": {
   "force_landsat": false,
   "region_uuid": "unique_string_1235",
-  "buff_dist":2500,
+  "buff_dist":5000,
   "name":"my_roi",
   "cont_year_start":2022,
   "cont_year_end":2023,

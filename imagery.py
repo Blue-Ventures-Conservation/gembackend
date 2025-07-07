@@ -1,5 +1,6 @@
 import ee
 import time
+import math
 from typing import Callable, Dict, List, Tuple
 from project import tile_timeout
 from assets import make_export, asset_dl_timeout
@@ -48,7 +49,7 @@ class NoHistoricalImages(Exception):
 
 def visualize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
     if buff_dist <= 0:
-        buff_dist = best_buffer(roi["polygon"], roi["excludes"])
+        buff_dist = best_buffer(roi["polygon"], roi["excludes"], roi.get("inland_mang", False))
     
     try:
         hhot, hlot, _ = hist_imagery(roi, buff_dist)
@@ -440,3 +441,92 @@ def produce_ndwi(img: ee.Image) -> ee.Image:
 
 def produce_savi(img: ee.Image) -> ee.Image:
     return img.select('B4').subtract(img.select('B3')).divide(img.select('B4').add(img.select('B3')).add(0.5)).multiply(1.5).rename(['SAVI'])
+
+def get_combined_sar_water_mask(roi: dict, buf_excl_roi: ee.Geometry) -> ee.Image:
+    cont_months, hist_months = get_roi_months(roi)
+    cont_mask = get_sar_water_mask(buf_excl_roi, roi["cont_year_start"], roi["cont_year_end"], cont_months)
+    hist_mask = get_sar_water_mask(buf_excl_roi, roi["hist_year_start"], roi["hist_year_end"], hist_months)
+    return cont_mask.add(hist_mask).gte(1)
+
+def filter_sar_edges(img: ee.Image) -> ee.Image:
+    vv = img.select('VV')
+    pos_edge = vv.gte(1.0)
+    neg_edge = vv.lte(-30.0)
+    masked = img.mask().And(neg_edge.Not()).And(pos_edge.Not())
+    return img.updateMask(masked)
+
+def classifyWater(img: ee.Image) -> ee.Image:
+    vv = img.select('VV')
+    return vv.lt(-17).rename('Water')
+
+# (mask out angles >= 45.23993) */
+def maskAngLT452(image: ee.Image) -> ee.Image:
+    ang = image.select(['angle'])
+    return image.updateMask(ang.lt(45.23993)).set('system:time_start', image.get('system:time_start'))
+
+# Function to mask out edges of images using angle.
+# * (mask out angles <= 30.63993) */
+def maskAngGT30(image: ee.Image) -> ee.Image:
+    ang = image.select(['angle'])
+    return image.updateMask(ang.gt(30.63993)).set('system:time_start', image.get('system:time_start'))
+    
+def get_sar_water_mask(buf_excl_roi: ee.Geometry, year1: int, year2: int, months: List[int]) -> ee.Image:
+    y2 = year2 + 1
+    s1 = ee.ImageCollection('COPERNICUS/S1_GRD') \
+            .filterBounds(buf_excl_roi) \
+            .filterDate(f'{year1}-01-01', f'{y2}-01-01') \
+            .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV')) \
+            .filter(ee.Filter.eq('instrumentMode', 'IW')) \
+            .filter(ee.Filter.eq('resolution_meters', 10)) \
+            .map(filter_sar_edges)
+    
+    s1 = filter_months(s1, months)
+    s1 = s1.map(maskAngLT452).map(maskAngGT30).select('VV')
+    s1 = s1.map(leeFilter).map(classifyWater)
+    return s1.reduce(ee.Reducer.sum()).gt(1).add(1).eq(1)
+
+# lee speckle filter implementation borrowed from:
+# https://github.com/zibnix/gee_s1_ard/blob/main/javascript/speckle_filter.js#L2
+def leeFilter(image: ee.Image) -> ee.Image:
+    bandNames = image.bandNames().remove('angle')
+    # S1-GRD images are multilooked 5 times in range
+    enl = 5
+    # Compute the speckle standard deviation
+    eta = 1.0/math.sqrt(enl)
+    eta = ee.Image.constant(eta)
+    
+    # MMSE estimator
+    # Neighbourhood mean and variance
+    oneImg = ee.Image.constant(1)
+    
+    reducers = ee.Reducer.mean().combine(
+            reducer2 = ee.Reducer.variance(),
+            sharedInputs = True
+    )
+    stats = image.select(bandNames).reduceNeighborhood(
+            reducer = reducers,
+            kernel = ee.Kernel.square(7/2, 'pixels'),
+            optimization = 'window'
+    )
+    
+    def add_mean(bandName: ee.String) -> ee.String:
+        return ee.String(bandName).cat('_mean')
+    
+    def add_variance(bandName: ee.String) -> ee.String:
+        return ee.String(bandName).cat('_variance')
+    
+    meanBand = bandNames.map(add_mean)
+    varBand = bandNames.map(add_variance)
+    
+    z_bar = stats.select(meanBand)
+    varz = stats.select(varBand)
+    
+    # Estimate weight 
+    varx = (varz.subtract(z_bar.pow(2).multiply(eta.pow(2)))).divide(oneImg.add(eta.pow(2)))
+    b = varx.divide(varz)
+    
+    # if b is negative set it to zero
+    new_b = b.where(b.lt(0), 0)
+    output = oneImg.subtract(new_b).multiply(z_bar.abs()).add(new_b.multiply(image.select(bandNames)))
+    output = output.rename(bandNames).multiply(-1)
+    return image.addBands(output, None, True)

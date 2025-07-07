@@ -69,7 +69,7 @@ def coastline(roi_poly: ee.Geometry) -> ee.Geometry:
     # select points in roi and convert to coordinate list
     return area_point.intersection(roi_poly, ee.ErrorMargin(1))
 
-def best_buffer(poly: dict, excludes: List[dict]) -> int:
+def best_buffer(poly: dict, excludes: List[dict], inland: bool) -> int:
     sums = area_chart(poly, excludes)["sums"]
     vals = sums["vals"]
     keys = sums["keys"]
@@ -81,7 +81,12 @@ def best_buffer(poly: dict, excludes: List[dict]) -> int:
             best = i
             break
     
-    return list(buffers.values())[best]
+    bb = list(buffers.values())[best]
+    
+    if inland == True:
+        return bb*2
+    
+    return bb
 
 def area_chart(poly: dict, excludes: List[dict]) -> Dict[str, dict]:
     mang = known_mangroves()

@@ -1,5 +1,5 @@
 {
-  "buff_dist":2500,
+  "inland_mang": true,
   "force_landsat": false,
   "name":"my_roi",
   "cont_year_start":2022,

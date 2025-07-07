@@ -5,7 +5,7 @@ from typing import List, Tuple, Dict
 
 from project import tile_timeout
 from roi import known_mangroves
-from imagery import cont_imagery_collection, hist_imagery_collection, mosaic_indices, produce_mndwi, produce_ndwi
+from imagery import get_combined_sar_water_mask, cont_imagery_collection, hist_imagery_collection, mosaic_indices, produce_mndwi, produce_ndwi
 from assets import MissingAsset, make_export, make_image_assets, asset_name, asset_exists, check_operation, asset_error, training_poly, asset_dl_timeout
 
 trees = 1000
@@ -137,13 +137,13 @@ def combined_classification_lazy(uid: str, cont_key: str, hist_key: str, use_con
 def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry, ee.Geometry, ee.Geometry, ee.List, int]:
     min_avg = default_min_avg
     conts, buf_excl_roi, indices, scale = cont_imagery_collection(roi, buff_dist)
-    
-    cont_water = ee.ImageCollection(conts).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
-    
     hists, _, _, _ = hist_imagery_collection(roi, buff_dist)
-    hist_water = ee.ImageCollection(hists).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
     
-    fmask = final_mask(buf_excl_roi, cont_water, hist_water)
+    water_mask = get_combined_sar_water_mask(roi, buf_excl_roi)
+    if scale >= 30:
+        water_mask = landsat_water_mask(conts, hists, buf_excl_roi)
+    
+    fmask = final_mask(buf_excl_roi, water_mask)
     
     chot, clot, _ = mosaic_indices(conts, buf_excl_roi, indices, scale)
     hhot, hlot, _ = mosaic_indices(hists, buf_excl_roi, indices, scale)
@@ -237,10 +237,9 @@ def classify_fully(image_op: str, classified: ee.Image, classifier: ee.Classifie
         "image_op": image_op,
     }
 
-def final_mask(region: ee.Geometry, clot: ee.Image, hlot: ee.Image) -> ee.Image:
-    mangs = known_mangroves().clip(region)
-    tmask = topo_mask(topo_dsm(), mangs)
-    
+def landsat_water_mask(conts: ee.ImageCollection, hists: ee.ImageCollection, buf_excl_roi: ee.Geometry) -> ee.Image:
+    cont_water = ee.ImageCollection(conts).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
+    hist_water = ee.ImageCollection(hists).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
     mndwi_cont = produce_mndwi(clot).lt(0.09)
     ndwi_cont = produce_ndwi(clot).lt(0.20)
     cont_water = mndwi_cont.add(ndwi_cont).gt(1)
@@ -250,8 +249,13 @@ def final_mask(region: ee.Geometry, clot: ee.Image, hlot: ee.Image) -> ee.Image:
     hist_water = mndwi_hist.add(ndwi_hist).gt(1)
     
     h2o_mask = cont_water.add(hist_water).gte(1)
+    return h2o_mask
+
+def final_mask(region: ee.Geometry, water_mask: ee.Image) -> ee.Image:
+    mangs = known_mangroves().clip(region)
+    tmask = topo_mask(topo_dsm(), mangs)
     
-    return h2o_mask.multiply(tmask).eq(1)
+    return water_mask.multiply(tmask).eq(1)
 
 def topo_dsm() -> ee.Image:
     elev = ee.ImageCollection("JAXA/ALOS/AW3D30/V3_2").select("DSM")
