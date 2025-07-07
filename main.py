@@ -34,7 +34,7 @@ if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""): # prod
     project.project_id = firebase_app.project_id
     accessor = Accessor()
     credentials, _ = google.auth.default()
-    ee.Initialize(project=project.project_id, credentials)
+    ee.Initialize(credentials, project=project.project_id)
     is_debug = False
 
 def token_check(func):
