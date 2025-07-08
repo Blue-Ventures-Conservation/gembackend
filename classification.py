@@ -135,7 +135,6 @@ def combined_classification_lazy(uid: str, cont_key: str, hist_key: str, use_con
     return cont_t_poly, hist_t_poly, cont_class, hist_class, cont_classifier, hist_classifier, cont_validation, hist_validation, region, palette, cont_sorts, cont_classes, scale
 
 def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry, ee.Geometry, ee.Geometry, ee.List, int]:
-    min_avg = default_min_avg
     conts, buf_excl_roi, indices, scale = cont_imagery_collection(roi, buff_dist)
     hists, _, _, _ = hist_imagery_collection(roi, buff_dist)
     
@@ -238,8 +237,10 @@ def classify_fully(image_op: str, classified: ee.Image, classifier: ee.Classifie
     }
 
 def landsat_water_mask(conts: ee.ImageCollection, hists: ee.ImageCollection, buf_excl_roi: ee.Geometry) -> ee.Image:
-    cont_water = ee.ImageCollection(conts).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
-    hist_water = ee.ImageCollection(hists).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
+    min_avg = default_min_avg
+    clot = ee.ImageCollection(conts).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
+    hlot = ee.ImageCollection(hists).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
+    
     mndwi_cont = produce_mndwi(clot).lt(0.09)
     ndwi_cont = produce_ndwi(clot).lt(0.20)
     cont_water = mndwi_cont.add(ndwi_cont).gt(1)

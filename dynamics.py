@@ -35,9 +35,9 @@ def dynamics_export(uid: str, region_uuid: str, target_classes: List[str], combi
         
         _, lmask, pmask, gmask = region_stats(True, region, class_num, classImgs, sortedValues, sortedNames, scale)
         
-        lmask = lmask.visualize(palette = red)
-        pmask = pmask.visualize(palette = blue)
-        gmask = gmask.visualize(palette = green)
+        lmask = lmask.visualize(palette = "#DD4425")
+        pmask = pmask.visualize(palette = "#008F00")
+        gmask = gmask.visualize(palette = "#0000DB")
         ltask = make_export(uid, lmask, region, "loss", scale)
         ptask = make_export(uid, pmask, region, "persistence", scale)
         gtask = make_export(uid, gmask, region, "gain", scale)
@@ -70,9 +70,9 @@ def get_dynamics(uid: str, region_uuid: str, target_classes: List[str], combined
                 "gain": rstats[tpos]["gain"],
                 "all_classes": rstats,
             },
-            "loss_url": lpg_url(lmask, red),
-            "persistence_url": lpg_url(pmask, blue),
-            "gain_url": lpg_url(gmask, green),
+            "loss_url": lpg_url(lmask, "#DD4425"),
+            "persistence_url": lpg_url(pmask, "#008F00"),
+            "gain_url": lpg_url(gmask, "#0000DB"),
             "created_at": int(time.time()),
             "timeout": tile_timeout,
             "sub_region_stats": []
