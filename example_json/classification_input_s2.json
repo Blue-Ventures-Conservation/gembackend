@@ -6,6 +6,7 @@
 "char_label": "Classname",
 "palette": ["#00FF00", "#FF0000", "#0000FF"],
 "roi": {
+  "inland_mang": true,
   "force_landsat": false,
   "region_uuid": "unique_string_1235",
   "buff_dist":5000,
