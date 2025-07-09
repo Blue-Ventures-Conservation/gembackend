@@ -1,4 +1,4 @@
-import os, argparse, ee
+import os, argparse, ee, warnings
 
 import logging
 import pprint
