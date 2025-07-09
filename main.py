@@ -35,6 +35,7 @@ if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""): # prod
     accessor = Accessor()
     credentials, _ = google.auth.default()
     ee.Initialize(credentials, project=project.project_id)
+    warnings.filterwarnings("ignore")
     is_debug = False
 
 def token_check(func):
