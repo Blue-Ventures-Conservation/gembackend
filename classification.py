@@ -259,7 +259,7 @@ def final_mask(region: ee.Geometry, water_mask: ee.Image) -> ee.Image:
     return water_mask.multiply(tmask).eq(1)
 
 def topo_dsm() -> ee.Image:
-    elev = ee.ImageCollection("JAXA/ALOS/AW3D30/V3_2").select("DSM")
+    elev = ee.ImageCollection("JAXA/ALOS/AW3D30/V4_1").select("DSM")
     proj = elev.first().select(0).projection()
     dsm = elev.mosaic().setDefaultProjection(proj).rename("elev")
     slp_img = ee.Terrain.slope(ee.Image(dsm).select("elev")).double().rename("slope")
