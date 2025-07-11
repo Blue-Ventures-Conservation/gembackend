@@ -155,10 +155,10 @@ def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_con
     
     ct_poly = training_poly(uid, cont_key, num_label)
     ht_poly = training_poly(uid, hist_key, num_label)
-    cont_sample = sample_image(cont_combo, ct_poly, [num_label, char_label, "ID_Numeric", "id_numeric", "ID", "id"], scale, True)
+    cont_sample = sample_image(cont_combo, ct_poly, [num_label, char_label, "ID_Numeric", "id_numeric", "ID", "id"], scale, False)
     hist_sample = cont_sample
     if not use_cont_spec:
-        hist_sample = sample_image(hist_combo, ht_poly, [num_label, char_label, "ID_Numeric", "id_numeric", "ID", "id"], scale, True)
+        hist_sample = sample_image(hist_combo, ht_poly, [num_label, char_label, "ID_Numeric", "id_numeric", "ID", "id"], scale, False)
     
     expanded_colors = ee.List([])
     if palette is not None:
@@ -188,7 +188,7 @@ def classify_lazy(combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.Feat
     sorteds = ee.List([nums, chars]).getInfo()
     classes = ordered_classes(list(map(list, zip(sorteds[0], sorteds[1]))))
     
-    sample = sample.randomColumn(seed = 1)
+    sample = sample.randomColumn(seed = (time.time_ns() // 1_000_000))
     training = sample.filter(ee.Filter.lt("random", 0.7))
     validation = sample.filter(ee.Filter.gte("random", 0.7))
     classifier = ee.Classifier.smileRandomForest(

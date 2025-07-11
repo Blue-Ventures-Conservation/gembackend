@@ -368,7 +368,7 @@ def ls_cloud_mask(img: ee.Image) -> ee.Image:
 def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry, scale: int) -> ee.ImageCollection:
     # import the PLASAT dataset and create an land mask
     land_mask = ee.ImageCollection('JAXA/ALOS/PALSAR/YEARLY/SAR') \
-            .filter(ee.Filter.date('2017-01-01', '2018-01-01')) \
+            .filter(ee.Filter.date('2018-01-01', '2019-01-01')) \
             .mosaic().clip(poly) \
             .select('qa').eq(50)
     
