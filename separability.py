@@ -222,6 +222,12 @@ def pearson_correlation(img: ee.Image, t_poly: ee.FeatureCollection) -> Dict[str
             if isinstance(elem, numbers.Number):
                 rounded.append(round(elem, 3))
             else:
+                # Typically caused by NaN, which seems to happen when the correlation is calculated too coarsely.
+                # In correlation_cell below, changing the scale parameter to the pearsonsCorrelation reduction
+                # appears to be the primary way to control this. A lower scale produces better results in general
+                # and fewer NaNs. However, creating this matrix does tend to run into limits around too many concurrent
+                # aggregations on the GEE side. So keeping tileScale at 1 is likely necessary.
+                # If we see more errors around concurrent aggregations, we would want to increase the scale.
                 rounded.append(0)
         
         corr[local_bands[idx]] = rounded
@@ -257,8 +263,8 @@ def correlation_cell(img: ee.Image, t_poly: ee.FeatureCollection) -> ee.Number:
         reducer = ee.Reducer.pearsonsCorrelation(),
         maxPixels = 1e13,
         geometry = t_poly,
-        scale = 300,
-        tileScale = 2,
+        scale = 100,
+        tileScale = 1,
     ).get('correlation')
 
 # returns ee.List of ee.String
