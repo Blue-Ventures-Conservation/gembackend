@@ -1,4 +1,5 @@
 import ee
+import numbers
 from typing import Dict, List, Tuple
 
 from enum import Enum
@@ -216,7 +217,14 @@ def pearson_correlation(img: ee.Image, t_poly: ee.FeatureCollection) -> Dict[str
     matrix = correlation_rows(s1, bands, img, t_poly) + correlation_rows(s2, bands, img, t_poly) + correlation_rows(s3, bands, img, t_poly)
     
     for idx, r in enumerate(matrix):
-        corr[local_bands[idx]] = [round(elem, 3) for elem in r]
+        rounded = []
+        for elem in r:
+            if isinstance(elem, numbers.Number):
+                rounded.append(round(elem, 3))
+            else:
+                rounded.append(0)
+        
+        corr[local_bands[idx]] = rounded
     
     return corr
 
