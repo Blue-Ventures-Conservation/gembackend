@@ -223,6 +223,7 @@ def maskArea(mask: ee.Image, geo: ee.Geometry, scale: int) -> ee.Number:
             geometry = geo,
             scale = scale,
             maxPixels = aggregation_max_pixels,
+            tileScale = 0.1,
             bestEffort = True,
     ).get("area")).round()
 
