@@ -20,6 +20,7 @@ COPY dynamics.py ./
 COPY requirements.txt ./
 
 # Install production dependencies.
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Run the web service on container startup. Here we use the gunicorn
