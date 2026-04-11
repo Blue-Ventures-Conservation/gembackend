@@ -21,11 +21,13 @@ def geo_coords(geo: ee.Geometry) -> List[list]:
 
 # poly here should be the dict equivalent of a geojson polygon
 def coastline(roi_poly: ee.Geometry) -> ee.Geometry:
-    mainlands = ee.FeatureCollection('projects/sat-io/open-datasets/shoreline/mainlands')
-    big_islands = ee.FeatureCollection('projects/sat-io/open-datasets/shoreline/big_islands')
-    small_islands = ee.FeatureCollection('projects/sat-io/open-datasets/shoreline/small_islands')
+    # mainlands = ee.FeatureCollection('projects/sat-io/open-datasets/shoreline/mainlands')
+    # big_islands = ee.FeatureCollection('projects/sat-io/open-datasets/shoreline/big_islands')
+    # small_islands = ee.FeatureCollection('projects/sat-io/open-datasets/shoreline/small_islands')
+    # area = mainlands.merge(big_islands).merge(small_islands).filterBounds(roi_poly)
+    s2Coast = ee.FeatureCollection('projects/sat-io/open-datasets/S2COAST-2023')
     # use the roi to clip the world boundary polygons
-    area = mainlands.merge(big_islands).merge(small_islands).filterBounds(roi_poly)
+    area = s2Coast.filterBounds(roi_poly)
     
     # max edges for simplify is 2,000,000
     # we divide by twenty, because to split the coordinates up

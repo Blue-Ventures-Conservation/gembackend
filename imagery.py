@@ -7,7 +7,6 @@ from assets import make_export, asset_dl_timeout
 from roi import coastline, best_buffer
 
 default_cloud_limit = 15  # percent
-default_tidal_zone = 1000 # meters
 default_indices = ["CMRI", "MMRI", "MNDWI", "SAVI"]
 # B4, B5, B3 false color composite
 imagery_vis = {'bands': ['Near IR', 'Shortwave IR 1', 'Red'], 'min': 0, 'max': 0.27}
@@ -155,29 +154,38 @@ def should_landsat(roi: dict, cont_months: List[int], hist_months: List[int]) ->
 def get_cloud_limit(roi: dict) -> int:
     return roi.get("cloud_limit", default_cloud_limit)
 
-def get_tidal_zone(roi: dict) -> int:
-    return roi.get("tidal_zone", default_tidal_zone)
-
 def cont_imagery(roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, int]:
     cont_months, hist_months = get_roi_months(roi)
-    return get_imagery(should_landsat(roi, cont_months, hist_months), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), get_tidal_zone(roi), roi.get("inland_mang", False), roi.get("excludes", []), roi["cont_year_start"], roi["cont_year_end"], cont_months)
+    return get_imagery(should_landsat(roi, cont_months, hist_months), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), roi.get("inland_mang", False), roi.get("excludes", []), roi["cont_year_start"], roi["cont_year_end"], cont_months)
  
 def hist_imagery(roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, int]:
     cont_months, hist_months = get_roi_months(roi)
-    return get_imagery(should_landsat(roi, cont_months, hist_months), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), get_tidal_zone(roi), roi.get("inland_mang", False), roi.get("excludes", []), roi["hist_year_start"], roi["hist_year_end"], hist_months)
+    return get_imagery(should_landsat(roi, cont_months, hist_months), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), roi.get("inland_mang", False), roi.get("excludes", []), roi["hist_year_start"], roi["hist_year_end"], hist_months)
 
 def cont_imagery_collection(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.Geometry, List[str], int]:
     cont_months, hist_months = get_roi_months(roi)
-    return get_imagery_collection(should_landsat(roi, cont_months, hist_months), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), get_tidal_zone(roi), roi.get("inland_mang", False), roi.get("excludes", []), roi["cont_year_start"], roi["cont_year_end"], cont_months)
+    return get_imagery_collection(should_landsat(roi, cont_months, hist_months), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), roi.get("inland_mang", False), roi.get("excludes", []), roi["cont_year_start"], roi["cont_year_end"], cont_months)
 
 def hist_imagery_collection(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollection, ee.Geometry, List[str], int]:
     cont_months, hist_months = get_roi_months(roi)
-    return get_imagery_collection(should_landsat(roi, cont_months, hist_months), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), get_tidal_zone(roi), roi.get("inland_mang", False), roi.get("excludes", []), roi["hist_year_start"], roi["hist_year_end"], hist_months)
+    return get_imagery_collection(should_landsat(roi, cont_months, hist_months), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), roi.get("inland_mang", False), roi.get("excludes", []), roi["hist_year_start"], roi["hist_year_end"], hist_months)
 
-def get_imagery_collection(landsat: bool, buff_dist: int, indices: List[str], poly: dict, cloud_limit: int, tidal_zone: int, inland_mang: bool, excludes: List[dict], year1: int, year2: int, months: List[int]) -> Tuple[ee.ImageCollection, ee.Geometry, List[str], int]:
+def get_imagery_collection(landsat: bool, buff_dist: int, indices: List[str], poly: dict, cloud_limit: int, inland_mang: bool, excludes: List[dict], year1: int, year2: int, months: List[int]) -> Tuple[ee.ImageCollection, ee.Geometry, List[str], int]:
     roi_poly = ee.Geometry(poly)
     buffered_roi_poly, coast = buffered_coastline(roi_poly, buff_dist, inland_mang, excludes)
-    zone = coast.simplify(500).buffer(tidal_zone).simplify(500)
+	
+    murray = ee.ImageCollection('UQ/murray/Intertidal/v1_1/global_intertidal').mosaic()
+    murray = murray.focalMin(1).focalMax(1)
+	
+    zone = murray.reduceToVectors(
+        geometry = roi_poly,
+        scale = 30,
+        crs = murray.projection(),
+        geometryType = 'polygon',
+        eightConnected = False,
+        bestEffort = True,
+        maxPixels = 1e13,
+    ).filter(ee.Filter.gt('count', 10)).geometry().simplify(75);
     
     images = None
     scale = None
@@ -226,8 +234,8 @@ def get_sentinel2_imagery(buffered_roi: ee.Geometry, cloud_limit: int, year1: in
     imgs = tide_bands(shore_refl(imgs, tidal_zone, buffered_roi, s2_scale))
     return s2_cloud_mask(imgs)
 
-def get_imagery(landsat: bool, buff_dist: int, indices: List[str], poly: dict, cloud_limit: int, tidal_zone: int, inland_mang: bool, excludes: List[dict], year1: int, year2: int, months: List[int]) -> Tuple[ee.Image, ee.Image, int]:
-    imgs, buf_excl_roi, indices, scale = get_imagery_collection(landsat, buff_dist, indices, poly, cloud_limit, tidal_zone, inland_mang, excludes, year1, year2, months)
+def get_imagery(landsat: bool, buff_dist: int, indices: List[str], poly: dict, cloud_limit: int, inland_mang: bool, excludes: List[dict], year1: int, year2: int, months: List[int]) -> Tuple[ee.Image, ee.Image, int]:
+    imgs, buf_excl_roi, indices, scale = get_imagery_collection(landsat, buff_dist, indices, poly, cloud_limit, inland_mang, excludes, year1, year2, months)
     return mosaic_indices(imgs, buf_excl_roi, indices, scale)
 
 def mosaic_indices(imgs: ee.ImageCollection, buffered_excluded_roi: ee.Geometry, indices: List[str], scale: int) -> Tuple[ee.Image, ee.Image, int]:
