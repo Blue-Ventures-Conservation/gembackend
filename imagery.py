@@ -388,7 +388,7 @@ def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry, s
         # use the MODIS land/water mask and cloud mask to mask out the land
         masked_mndwi = mndwi.updateMask(land_mask)
         # reduce the image to the buffered shoreline, calculating a MNDWI
-        cum_val = masked_mndwi.reduceRegion(
+        cumulative = masked_mndwi.reduceRegion(
             reducer = ee.Reducer.mean(),
             geometry = zone,
             scale = 100,
@@ -398,7 +398,8 @@ def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry, s
         ).get('MNDWI')
         
         # input that value into the image metadata as the property 'MNDWI'
-        return img.set('MNDWI', ee.Number(cum_val))
+        cumulative = ee.Algorithms.If(cumulative, cumulative, -1)
+        return img.set('MNDWI', ee.Number(cumulative))
     
     m = ee.ImageCollection(imgs).map(mndwi_map)
     
