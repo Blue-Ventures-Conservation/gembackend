@@ -239,8 +239,8 @@ def get_imagery(landsat: bool, buff_dist: int, indices: List[str], poly: dict, c
     return mosaic_indices(imgs, buf_excl_roi, indices, scale)
 
 def mosaic_indices(imgs: ee.ImageCollection, buffered_excluded_roi: ee.Geometry, indices: List[str], scale: int) -> Tuple[ee.Image, ee.Image, int]:
-    high_tide = ee.ImageCollection(imgs).qualityMosaic("MNDWI").select(optical_bands).clip(buffered_excluded_roi)
-    low_tide = ee.ImageCollection(imgs).qualityMosaic("inv_MNDWI").select(optical_bands).clip(buffered_excluded_roi)
+    high_tide = ee.ImageCollection(imgs).qualityMosaic("MNDWI").select(optical_bands).clip(buffered_excluded_roi).reproject('EPSG:4326', None, scale)
+    low_tide = ee.ImageCollection(imgs).qualityMosaic("inv_MNDWI").select(optical_bands).clip(buffered_excluded_roi).reproject('EPSG:4326', None, scale)
     
     known_indices = []
     
