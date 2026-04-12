@@ -8,7 +8,7 @@ from roi import coastline, best_buffer
 
 default_cloud_limit = 15  # percent
 default_indices = ["CMRI", "MMRI", "MNDWI", "SAVI"]
-# B4, B5, B3 false colour composite
+# B4, B5, B3 false color composite
 imagery_vis = {'bands': ['Near IR', 'Shortwave IR 1', 'Red'], 'min': 0, 'max': 0.27}
 
 ls4_dataset = "LANDSAT/LT04/C02/T1_L2"
