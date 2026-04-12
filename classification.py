@@ -294,24 +294,25 @@ def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, props: List[str], 
         
         fifth = t_poly.size().divide(5).int().add(1)
         
-        s1 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth)), props, ts, geometries)
-        s2 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth)), props, ts, geometries)
-        s3 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth.multiply(2))), props, ts, geometries)
-        s4 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth.multiply(3))), props, ts, geometries)
-        s5 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth.multiply(4))), props, ts, geometries)
+        s1 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth)), props, scale, ts, geometries)
+        s2 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth)), props, scale, ts, geometries)
+        s3 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth.multiply(2))), props, scale, ts, geometries)
+        s4 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth.multiply(3))), props, scale, ts, geometries)
+        s5 = sample_regions(img, ee.FeatureCollection(t_poly.toList(fifth, fifth.multiply(4))), props, scale, ts, geometries)
         
         # this seems to work for splitting the work up to avoid too many concurrent aggregations
         # while also not requiring us to pull down the full FeatureCollection locally
         sample = ee.FeatureCollection([s1, s2, s3, s4, s5]).flatten()
     else:
-        sample = sample_regions(img, t_poly, props, 16, geometries)
+        sample = sample_regions(img, t_poly, props, scale, 16, geometries)
     
     return sample
 
-def sample_regions(img: ee.Image, collection: ee.FeatureCollection, props: List[str], tileScale: int, geometries: bool) -> ee.FeatureCollection:
+def sample_regions(img: ee.Image, collection: ee.FeatureCollection, props: List[str], scale: int, tileScale: int, geometries: bool) -> ee.FeatureCollection:
     return img.sampleRegions(
             collection = collection,
             properties = props,
+            scale = scale,
             tileScale = tileScale,
             geometries = geometries,
     )
