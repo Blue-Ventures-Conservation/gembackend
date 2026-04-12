@@ -5,9 +5,17 @@ FROM python:3.9-slim
 # Allow statements and log messages to immediately appear in the Knative logs
 ENV PYTHONUNBUFFERED True
 
-# Copy local code to the container image.
 ENV APP_HOME /app
 WORKDIR $APP_HOME
+
+# Copy dependency manifest
+COPY requirements.txt ./
+
+# Install production dependencies.
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy local code to the container image.
 COPY main.py ./
 COPY access.py ./
 COPY project.py ./
@@ -17,11 +25,6 @@ COPY imagery.py ./
 COPY classification.py ./
 COPY separability.py ./
 COPY dynamics.py ./
-COPY requirements.txt ./
-
-# Install production dependencies.
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential
-RUN pip install --no-cache-dir -r requirements.txt
 
 # Run the web service on container startup. Here we use the gunicorn
 # webserver, with one worker process and 8 threads.
