@@ -2,6 +2,7 @@
 .gitignore
 Dockerfile
 README.md
+*.swp
 *.pyc
 *.pyo
 *.pyd
