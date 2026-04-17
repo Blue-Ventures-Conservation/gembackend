@@ -9,7 +9,7 @@ from roi import coastline, best_buffer
 default_cloud_limit = 15  # percent
 default_indices = ["CMRI", "MMRI", "MNDWI", "SAVI"]
 # B4, B5, B3 false color composite
-imagery_vis = {'bands': ['Near IR', 'Shortwave IR 1', 'Red'], 'min': 0, 'max': 0.27}
+imagery_vis = {'bands': ['NIR', 'SWIR1', 'Red'], 'min': 0, 'max': 0.27}
 
 ls4_dataset = "LANDSAT/LT04/C02/T1_L2"
 ls5_dataset = "LANDSAT/LT05/C02/T1_L2"
@@ -22,6 +22,11 @@ ls_cloud_property = "CLOUD_COVER"
 ls_tir_rename = 'Heat'
 oli_bands = ['SR_B2','SR_B3','SR_B4','SR_B5','SR_B6','SR_B7','ST_B10']
 etm_bands = ['SR_B1','SR_B2','SR_B3','SR_B4','SR_B5','SR_B7','ST_B6']
+bgr = ['Blue', 'Green', 'Red']
+nir = ['NIR']
+swirs = ['SWIR1', 'SWIR2']
+ls_human_bands = bgr + nir + swirs
+tide_band_names = ['MNDWI', 'inv_MNDWI']
 
 s2_dataset = "COPERNICUS/S2_SR_HARMONIZED"
 s2_start_year = 2018
@@ -29,13 +34,8 @@ s2_start_month = 12
 s2_scale = 10
 s2_qa_pixel = "QA60"
 s2_cloud_property = "CLOUDY_PIXEL_PERCENTAGE"
-s2_bands = ['B2','B3','B4','B8','B11','B12']
-
-# temp names used for calculating spectral indices
-optical_bands = ['B1','B2','B3','B4','B5','B7']
-
-# names to be shown in the UI on the frontend
-human_bands = ['Blue', 'Green', 'Red', 'Near IR', 'Shortwave IR 1', 'Shortwave IR 2']
+s2_bands = ['B2','B3','B4','B5','B6','B7','B8','B8A','B11','B12']
+s2_human_bands = bgr + ['RE1', 'RE2', 'RE3'] + nir + ['RE4'] + swirs
 
 class NoImages(Exception):
     pass
@@ -205,7 +205,7 @@ def get_landsat_imagery(buffered_roi: ee.Geometry, cloud_limit: int, year1: int,
     ls8 = ls8_imagery(buffered_roi, cloud_limit, year1, year2, months)
     ls9 = ls9_imagery(buffered_roi, cloud_limit, year1, year2, months)
     
-    renames = ee.List(optical_bands).cat([ls_tir_rename, ls_qa_pixel])
+    renames = ee.List(ls_human_bands).cat([ls_tir_rename, ls_qa_pixel])
     
     # rename bands
     oli_imgs = ee.ImageCollection(ls8.merge(ls9)) \
@@ -221,51 +221,45 @@ def get_landsat_imagery(buffered_roi: ee.Geometry, cloud_limit: int, year1: int,
     if img_count <= 0:
         raise NoImages()
     
-    swir1 = ee.String(optical_bands[4])
+    swir1 = ee.String(ls_human_bands[4])
     imgs = clamp_band(imgs.map(ls_scale_factors).map(fix_float), swir1, renames)
-    imgs = tide_bands(shore_refl(imgs, tidal_zone, buffered_roi, ls_scale))
-    return imgs.map(ls_cloud_mask)
+    imgs = shore_refl(imgs, tidal_zone, buffered_roi, ls_scale)
+    return imgs.map(ls_cloud_mask).select(ls_human_bands + tide_band_names)
 
 def get_sentinel2_imagery(buffered_roi: ee.Geometry, cloud_limit: int, year1: int, year2: int, months: List[int], tidal_zone: ee.Geometry) -> ee.ImageCollection:
     s2 = sentinel2_imagery(buffered_roi, cloud_limit, year1, year2, months)
     
-    renames = ee.List(optical_bands).add(s2_qa_pixel)
+    renames = ee.List(s2_human_bands).add(s2_qa_pixel)
     imgs = ee.ImageCollection(s2).select(ee.List(s2_bands).add(s2_qa_pixel), renames).map(s2_scale_factors)
-    imgs = tide_bands(shore_refl(imgs, tidal_zone, buffered_roi, s2_scale))
-    return s2_cloud_mask(imgs)
+    imgs = shore_refl(imgs, tidal_zone, buffered_roi, s2_scale)
+    return s2_cloud_mask(imgs).select(s2_human_bands + tide_band_names)
 
 def get_imagery(landsat: bool, buff_dist: int, indices: List[str], poly: dict, cloud_limit: int, inland_mang: bool, excludes: List[dict], year1: int, year2: int, months: List[int]) -> Tuple[ee.Image, ee.Image, int]:
     imgs, buf_excl_roi, indices, scale = get_imagery_collection(landsat, buff_dist, indices, poly, cloud_limit, inland_mang, excludes, year1, year2, months)
     return mosaic_indices(imgs, buf_excl_roi, indices, scale)
 
 def mosaic_indices(imgs: ee.ImageCollection, buffered_excluded_roi: ee.Geometry, indices: List[str], scale: int) -> Tuple[ee.Image, ee.Image, int]:
-    high_tide = ee.ImageCollection(imgs).qualityMosaic("MNDWI").select(optical_bands).clip(buffered_excluded_roi)
-    low_tide = ee.ImageCollection(imgs).qualityMosaic("inv_MNDWI").select(optical_bands).clip(buffered_excluded_roi)
+    high_tide = ee.ImageCollection(imgs).qualityMosaic("MNDWI").clip(buffered_excluded_roi)
+    low_tide = ee.ImageCollection(imgs).qualityMosaic("inv_MNDWI").clip(buffered_excluded_roi)
     
-    known_indices = []
+    # slice off mndwi and inv_mndwi bands
+    bnames = high_tide.bandNames().slice(0, -2)
+    high_tide = high_tide.select(bnames)
+    low_tide = low_tide.select(bnames)
     
     for idx in indices:
         if idx == 'CMRI':
             high_tide = add_cmri(high_tide)
             low_tide = add_cmri(low_tide)
-            known_indices.append('CMRI')
         elif idx == 'MMRI':
             high_tide = add_mmri(high_tide)
             low_tide = add_mmri(low_tide)
-            known_indices.append('MMRI')
         elif idx == 'MNDWI':
             high_tide = add_mndwi(high_tide)
             low_tide = add_mndwi(low_tide)
-            known_indices.append('MNDWI')
         elif idx == 'SAVI':
             high_tide = add_savi(high_tide)
             low_tide = add_savi(low_tide)
-            known_indices.append('SAVI')
-    
-    current_bands = optical_bands + known_indices
-    renamed_bands = human_bands + known_indices
-    high_tide = high_tide.select(current_bands, renamed_bands)
-    low_tide = low_tide.select(current_bands, renamed_bands)
     
     return high_tide.float(), low_tide.float(), scale
 
@@ -273,7 +267,7 @@ def sentinel2_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: in
     return filter_collection(s2_dataset, poly, s2_cloud_property, cloud_limit, year1, year2, months)
 
 def s2_scale_factors(img: ee.Image) -> ee.Image:
-    optics = img.select(optical_bands).divide(10000)
+    optics = img.select(s2_human_bands).divide(10000)
     return img.addBands(optics, None, True)
 
 def s2_cloud_mask(imgs: ee.ImageCollection) -> ee.ImageCollection:
@@ -342,16 +336,16 @@ def filter_collection(dataset: str, poly: ee.Geometry, cloud_property: str, clou
 def etm_to_oli(img: ee.Image) -> ee.Image:
     itcps = ee.Image.constant([0.0003, 0.0088, 0.0061, 0.0412, 0.0254, 0.0172]).multiply(10000)
     slopes = ee.Image.constant([0.8474, 0.8483, 0.9047, 0.8462, 0.8937, 0.9071])
-    return img.select(optical_bands).multiply(slopes) \
+    return img.select(ls_human_bands).multiply(slopes) \
             .add(itcps).round().toShort().addBands(img.select(ls_tir_rename, ls_qa_pixel))
 
 def ls_scale_factors(img: ee.Image) -> ee.Image:
-    optics = img.select(optical_bands).multiply(0.0000275).add(-0.2)
+    optics = img.select(ls_human_bands).multiply(0.0000275).add(-0.2)
     thermals = img.select([ls_tir_rename]).multiply(0.00341802).add(149.0)
     return img.addBands(optics, None, True).addBands(thermals, None, True)
 
 def fix_float(img: ee.Image) -> ee.Image:
-    specCast = img.select(optical_bands).cast(ee.Dictionary.fromLists(optical_bands, ee.List.repeat('float', 6)))
+    specCast = img.select(ls_human_bands).cast(ee.Dictionary.fromLists(ls_human_bands, ee.List.repeat('float', 6)))
     return img.addBands(specCast, None, True)
 
 def clamp_band(images: ee.ImageCollection, clamp_band: str, all_bands: List[str]) -> ee.ImageCollection:
@@ -437,16 +431,16 @@ def add_savi(img: ee.Image) -> ee.Image:
     return img.addBands(produce_savi(img))
 
 def produce_ndvi(img: ee.Image) -> ee.Image:
-    return img.expression('(B4 - B3)/(B4 + B3)', {'B4': img.select('B4'), 'B3': img.select('B3')}).rename(['NDVI'])
+    return img.expression('(B4 - B3)/(B4 + B3)', {'B4': img.select('NIR'), 'B3': img.select('Red')}).rename(['NDVI'])
 
 def produce_mndwi(img: ee.Image) -> ee.Image:
-    return img.expression('(B2 - B5)/(B2 + B5)', {'B2': img.select('B2'), 'B5': img.select('B5')}).rename(['MNDWI'])
+    return img.expression('(B2 - B5)/(B2 + B5)', {'B2': img.select('Green'), 'B5': img.select('SWIR1')}).rename(['MNDWI'])
 
 def produce_ndwi(img: ee.Image) -> ee.Image:
-    return img.expression('(B2 - B4)/(B2 + B4)', {'B2': img.select('B2'), 'B4': img.select('B4')}).rename(['NDWI'])
+    return img.expression('(B2 - B4)/(B2 + B4)', {'B2': img.select('Green'), 'B4': img.select('NIR')}).rename(['NDWI'])
 
 def produce_savi(img: ee.Image) -> ee.Image:
-    return img.select('B4').subtract(img.select('B3')).divide(img.select('B4').add(img.select('B3')).add(0.5)).multiply(1.5).rename(['SAVI'])
+    return img.select('NIR').subtract(img.select('Red')).divide(img.select('NIR').add(img.select('Red')).add(0.5)).multiply(1.5).rename(['SAVI'])
 
 def get_combined_sar_water_mask(roi: dict, buf_excl_roi: ee.Geometry) -> ee.Image:
     cont_months, hist_months = get_roi_months(roi)
