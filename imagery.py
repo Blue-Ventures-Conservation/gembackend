@@ -37,6 +37,9 @@ s2_cloud_property = "CLOUDY_PIXEL_PERCENTAGE"
 s2_bands = ['B2','B3','B4','B5','B6','B7','B8','B8A','B11','B12']
 s2_human_bands = bgr + ['RE1', 'RE2', 'RE3'] + nir + ['RE4'] + swirs
 
+sar_start_year = 2014
+sar_start_month = 10
+
 class NoImages(Exception):
     pass
 
@@ -126,6 +129,16 @@ def should_use_s2(cont_start_year: int, cont_months: List[int], hist_start_year:
 def fits_s2_range(year: int, months: List[int]) -> bool:
     finalYearMaxLen = 13 - s2_start_month
     return (year > s2_start_year) or (year == s2_start_year and (len(months) >= finalYearMaxLen and months[0] >= s2_start_month))
+
+def fits_sar_range(year: int, months: List[int]) -> bool:
+    finalYearMaxLen = 13 - sar_start_month
+    return (year > sar_start_year) or (year == sar_start_year and (len(months) >= finalYearMaxLen and months[0] >= sar_start_month))
+
+def should_use_sar(roi: dict) -> bool:
+    cont_months, hist_months = get_roi_months(roi)
+    cont_start_year = roi["cont_year_start"]
+    hist_start_year = roi["hist_year_start"]
+    return fits_sar_range(cont_start_year, cont_months) and fits_sar_range(hist_start_year, hist_months)
 
 def get_roi_months(roi: dict) -> Tuple[List[int], List[int]]:
     if "cont_months" in roi and "hist_months" in roi:

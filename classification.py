@@ -5,7 +5,7 @@ from typing import List, Tuple, Dict
 
 from project import tile_timeout
 from roi import known_mangroves
-from imagery import get_combined_sar_water_mask, cont_imagery_collection, hist_imagery_collection, mosaic_indices, produce_mndwi, produce_ndwi
+from imagery import should_use_sar, get_combined_sar_water_mask, cont_imagery_collection, hist_imagery_collection, mosaic_indices, produce_mndwi, produce_ndwi
 from assets import MissingAsset, make_export, make_image_assets, asset_name, asset_exists, check_operation, asset_error, training_poly, asset_dl_timeout
 
 trees = 1000
@@ -138,8 +138,10 @@ def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_con
     conts, buf_excl_roi, indices, scale = cont_imagery_collection(roi, buff_dist)
     hists, _, _, _ = hist_imagery_collection(roi, buff_dist)
     
-    water_mask = get_combined_sar_water_mask(roi, buf_excl_roi)
-    if scale >= 30:
+    water_mask = None
+    if should_use_sar(roi):
+        water_mask = get_combined_sar_water_mask(roi, buf_excl_roi)
+    else:
         water_mask = landsat_water_mask(conts, hists, buf_excl_roi)
     
     fmask = final_mask(buf_excl_roi, water_mask)
