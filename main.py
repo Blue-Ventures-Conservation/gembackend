@@ -9,7 +9,6 @@ from flask import Flask, request, abort, jsonify
 from firebase_admin import auth, credentials, initialize_app, storage
 import google.auth
 import project
-from access import *
 from roi import *
 from imagery import *
 from assets import *
@@ -20,7 +19,6 @@ from dynamics import *
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
 firebase_app = None
-accessor = None
 
 # debug vars
 is_debug = True
@@ -32,7 +30,6 @@ debug_email = None
 if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""): # prod
     firebase_app = initialize_app()
     project.project_id = firebase_app.project_id
-    accessor = Accessor()
     credentials, _ = google.auth.default()
     ee.Initialize(credentials, project=project.project_id)
     is_debug = False
@@ -56,9 +53,6 @@ def token_check(func):
                 print("debug error:", fail, "using uid:", uid, "using email:", email)
             else:
                 abort(401) # raise HTTPException
-
-        if not accessor.is_allowed(email):
-            abort(403)
 
         if len(signature(func).parameters) == 1:
             return func(uid)
@@ -298,7 +292,6 @@ if __name__ == "__main__":
     ee.Initialize(ee.ServiceAccountCredentials(args.sa, args.saf))
     firebase_app = initialize_app(credentials.Certificate(args.saf))
     project.project_id = firebase_app.project_id
-    accessor = Accessor()
     debug_uid = args.uid
     debug_email = args.email
     
