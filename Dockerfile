@@ -17,7 +17,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy local code to the container image.
 COPY main.py ./
-COPY access.py ./
 COPY project.py ./
 COPY roi.py ./
 COPY assets.py ./
