@@ -8,7 +8,7 @@ asset_users_path = 'projects/{project_id}/assets/users/'
 asset_uid_path = asset_users_path+'{uid}'
 asset_users_table_path = asset_users_path+'{uid}/{key}'
 asset_default_bucket = '{project_id}.appspot.com'
-asset_user_geojsons = 'gs://{bucket}/users/{uid}/geojsons/{key}.geojson'
+asset_user_geojsons = 'gs://{bucket}/users/{uid}/geojsons/{key}.zip'
 asset_user_shps = 'gs://{bucket}/users/{uid}/shps/{key}.zip'
 asset_user_downloads = 'users/{uid}/downloads/{name}_{slug}'
 # 47 hours x 60 min x 60 min
