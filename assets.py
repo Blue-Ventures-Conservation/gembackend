@@ -8,6 +8,7 @@ asset_users_path = 'projects/{project_id}/assets/users/'
 asset_uid_path = asset_users_path+'{uid}'
 asset_users_table_path = asset_users_path+'{uid}/{key}'
 asset_default_bucket = '{project_id}.appspot.com'
+asset_user_geojsons = 'gs://{bucket}/users/{uid}/geojsons/{key}.geojson'
 asset_user_shps = 'gs://{bucket}/users/{uid}/shps/{key}.zip'
 asset_user_downloads = 'users/{uid}/downloads/{name}_{slug}'
 # 47 hours x 60 min x 60 min
@@ -101,7 +102,7 @@ def create_user_asset_folder(uid: str) -> bool:
         else:
             return False
 
-def upload_table_asset(uid: str, key: str, overwrite: bool) -> Tuple[str, bool]:
+def upload_table_asset(uid: str, key: str, isShapefile: bool, overwrite: bool) -> Tuple[str, bool]:
     if not create_user_asset_folder(uid):
         return "", False
     
@@ -113,8 +114,11 @@ def upload_table_asset(uid: str, key: str, overwrite: bool) -> Tuple[str, bool]:
     if exists and overwrite and not delete_asset(name):
         return "", False
     
+    formatString = asset_user_geojsons
+    if isShapefile:
+        formatString = asset_user_shps
     try:
-        shp = asset_user_shps.format(bucket = asset_default_bucket.format(project_id=project.project_id), uid = uid, key = key)
+        shp = formatString.format(bucket = asset_default_bucket.format(project_id=project.project_id), uid = uid, key = key)
         result = ee.data.startTableIngestion(request_id = ee.data.newTaskId()[0], params = {'name': name, 'sources': [{'uris': [shp], 'charset': 'UTF-8'}]})
         return result['name'], True
     except:
