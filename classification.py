@@ -184,9 +184,9 @@ def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_con
 
 def classify_lazy(combo: ee.Image, sample: ee.FeatureCollection, t_poly: ee.FeatureCollection, region: ee.Geometry, num_label: str, char_label: str) -> Tuple[List[str], list, ee.Image, ee.Classifier, ee.FeatureCollection, ee.FeatureCollection]:
     bands = combo.bandNames()
-    sorts = ee.FeatureCollection(t_poly).distinct(num_label).sort(num_label);
-    nums = sorts.aggregate_array(num_label);
-    chars = sorts.aggregate_array(char_label);
+    sorts = ee.FeatureCollection(t_poly).distinct(num_label).sort(num_label)
+    nums = sorts.aggregate_array(num_label)
+    chars = sorts.aggregate_array(char_label)
     sorteds = ee.List([nums, chars]).getInfo()
     classes = ordered_classes(list(map(list, zip(sorteds[0], sorteds[1]))))
     
@@ -223,10 +223,40 @@ def visual(t_poly: ee.FeatureCollection, num_label: str, palette: ee.List) -> di
     return ee.Dictionary({"min": min_no, "max": max_no, "palette": palette}).getInfo()
 
 def classify_fully(image_op: str, classified: ee.Image, classifier: ee.Classifier, validation: ee.FeatureCollection, t_poly: ee.FeatureCollection, num_label: str, palette: ee.List) -> dict:
-    train_accuracy = classifier.confusionMatrix()
-    validated = validation.classify(classifier)
-    test_accuracy = validated.errorMatrix(num_label, "classification")
+    order = t_poly.aggregate_array(num_label).distinct().sort()
     
+    # Get a confusion matrix resubstitution accuracy.
+    # Because there is no order argument available for the confusionMatrix
+    # function, we need to iterate over the matrix and remove all rows and
+    # columns that represent sequential class IDs that we didn't actually use.
+    conf_list = classifier.confusionMatrix().array().toList()
+    order = order.filter(ee.Filter.lt('item', conf_list.size()))
+    
+    def makeMatrixRow(rowIndx: ee.Number, previous: ee.List) -> ee.List:
+        plist = ee.List(previous)
+        conf = ee.List(plist.get(0))
+        ordr = ee.List(plist.get(1))
+        matrix = ee.List(plist.get(2))
+        row = ee.List(conf.get(rowIndx))
+        
+        def rowElements(colIndx: ee.Number, prev: ee.List) -> ee.List:
+            p = ee.List(prev)
+            r = ee.List(p.get(0))
+            mrow = ee.List(p.get(1))
+            return ee.List([r, mrow.add(r.get(colIndx))])
+        
+        matrixRow = ee.List(ordr.iterate(rowElements, ee.List([row, ee.List([])]))).get(1)
+        return ee.List([conf, ordr, matrix.add(matrixRow)])
+    
+    result = ee.List(order.iterate(makeMatrixRow, ee.List([conf_list, order, ee.List([])])))
+    
+    # The order argument here just names the rows/columns and wouldn't do the filtering above for us.
+    train_accuracy = ee.ConfusionMatrix(ee.Array(ee.List(result.get(2))), order)
+    validated = validation.classify(classifier)
+    # Passing the order argument here filters the matrix to remove the sequential rows/cols
+    # that aren't actually part of our classification.
+    test_accuracy = validated.errorMatrix(num_label, 'classification', order)
+     
     classification_url = classified.getMapId(visual(t_poly, num_label, palette))["tile_fetcher"].url_format
     
     accs = ee.List([train_accuracy.accuracy(), test_accuracy.accuracy()]).getInfo()
