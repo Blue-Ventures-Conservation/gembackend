@@ -321,7 +321,7 @@ def ls7_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: int, mon
         dateFiltered = ls7.filterDate(f'{year1}-01-01', f'{y2}-01-01')
     
     images = dateFiltered.filterBounds(poly) \
-        .filterMetadata("CLOUD_COVER", "not_greater_than", cloud_limit)
+        .filter(ee.Filter.gt("CLOUD_COVER", cloud_limit).Not())
     
     return filter_months(images, months)
 
@@ -341,7 +341,7 @@ def filter_months(images: ee.ImageCollection, months: List[int]) -> ee.ImageColl
 def filter_collection(dataset: str, poly: ee.Geometry, cloud_property: str, cloud_limit: int, year1: int, year2: int, months: List[int]) -> ee.ImageCollection:
     y2 = year2 + 1
     images = ee.ImageCollection(dataset).filterBounds(poly) \
-        .filterMetadata(cloud_property, "not_greater_than", cloud_limit) \
+        .filter(ee.Filter.gt(cloud_property, cloud_limit).Not()) \
         .filterDate(f'{year1}-01-01', f'{y2}-01-01')
     
     return filter_months(images, months)
