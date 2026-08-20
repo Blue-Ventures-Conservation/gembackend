@@ -26,8 +26,9 @@ def coastline(roi_poly: ee.Geometry) -> ee.Geometry:
     # small_islands = ee.FeatureCollection('projects/sat-io/open-datasets/shoreline/small_islands')
     # area = mainlands.merge(big_islands).merge(small_islands).filterBounds(roi_poly)
     s2Coast = ee.FeatureCollection('projects/sat-io/open-datasets/S2COAST-2023')
+    narinda = ee.FeatureCollection('projects/gem-project-378721/assets/S2Coast_gapfill_Helodrano_Narinda')
     # use the roi to clip the world boundary polygons
-    area = s2Coast.filterBounds(roi_poly)
+    area = s2Coast.merge(narinda).filterBounds(roi_poly)
     
     # max edges for simplify is 2,000,000
     # we divide by twenty, because to split the coordinates up
