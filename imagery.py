@@ -195,22 +195,26 @@ def get_tidal_zone(roi_poly: ee.Geometry) -> ee.Geometry:
         eightConnected = False,
         bestEffort = True,
         maxPixels = 1e13,
-    ).filter(ee.Filter.gt('count', 10)).geometry().simplify(75);
+    ).filter(ee.Filter.gt('count', 10)).geometry().simplify(75)
 
 def get_imagery_collection(landsat: bool, buff_dist: int, indices: List[str], poly: dict, cloud_limit: int, inland_mang: bool, excludes: List[dict], year1: int, year2: int, months: List[int]) -> Tuple[ee.ImageCollection, ee.Geometry, List[str], int]:
     roi_poly = ee.Geometry(poly)
     buffered_roi_poly, coast = buffered_coastline(roi_poly, buff_dist, inland_mang, excludes) 
-
+    
     zone = get_tidal_zone(roi_poly)
     
     images = None
     scale = None
     if landsat == True:
         images = get_landsat_imagery(buffered_roi_poly, cloud_limit, year1, year2, months, zone)
+        refl_percentile = 85
         scale = ls_scale
     else:
         images = get_sentinel2_imagery(buffered_roi_poly, cloud_limit, year1, year2, months, zone)
+        refl_percentile = 70
         scale = s2_scale
+    
+    images = filter_high_reflectance(buffered_roi_poly, images, refl_percentile)
     
     return images, buffered_roi_poly, indices, scale
 
@@ -426,6 +430,42 @@ def tide_bands(imgs: ee.ImageCollection) -> ee.ImageCollection:
         return img.addBands(img.metadata("inv_MNDWI"))
     
     return imgs.map(mndwi_band).map(inv_mndwi).map(inv_mndwi_band)
+
+def palsar_water_mask(roi) -> ee.ImageCollection:
+    return ee.ImageCollection('JAXA/ALOS/PALSAR/YEARLY/SAR') \
+        .filter(ee.Filter.date('2018-01-01', '2019-01-01')) \
+        .mosaic().clip(roi) \
+        .select('qa').neq(50)
+
+def filter_high_reflectance(buffered_roi: ee.Geometry, images: ee.ImageCollection, percentile: int) -> ee.ImageCollection:
+    images = ee.ImageCollection(images)
+    wmask = palsar_water_mask(buffered_roi)
+    reflsum = "refl_sum"
+    
+    def reflectanceSum(img: ee.Image) -> ee.Image:
+        img = ee.Image(img)
+        blue = img.select("Blue")
+        green = img.select("Green")
+        red = img.select("Red")
+        num = blue.add(green).add(red).rename(reflsum).updateMask(wmask).reduceRegion(
+            reducer = ee.Reducer.mean(),
+            geometry = wmask.geometry(),
+            scale = 100,
+            maxPixels = 1e15,
+            bestEffort = True,
+            tileScale = 1
+        ).get(reflsum)
+        num = ee.Algorithms.If(num, num, -1)
+        return img.set(reflsum, ee.Number(num))
+    
+    images = images.map(reflectanceSum)
+    
+    reflList = images.aggregate_array(reflsum).sort()
+    listSize = reflList.size()
+    i = listSize.multiply(percentile / 100).floor()
+    threshold = ee.Number(reflList.get(i))
+    
+    return images.filter(ee.Filter.lt(reflsum, threshold))
 
 #
 # We don't use normalizedDifference from the API because it affects classification poorly for some reason...
