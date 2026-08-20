@@ -375,16 +375,12 @@ def clamp_band(images: ee.ImageCollection, clamp_band: str, all_bands: List[str]
     return images.map(clampf)
 
 def ls_cloud_mask(img: ee.Image) -> ee.Image:
-    # Bits 3 and 5 are cloud shadow and cloud, respectively.
-    cloudShadowBitMask = (1 << 3)
-    cloudsBitMask = (1 << 5)
-    # Get the pixel QA band.
     qa = img.select(ls_qa_pixel)
-    # Both flags should be set to zero, indicating clear conditions.
-    mask = qa.bitwiseAnd(cloudShadowBitMask).eq(0).And(qa.bitwiseAnd(cloudsBitMask).eq(0))
+    # Cloud (Bit 3), Dilated Cloud (Bit 1), and Cloud Shadow (Bit 4)
+    mask = qa.bitwiseAnd(1 << 3).eq(0).And(qa.bitwiseAnd(1 << 1).eq(0)).And(qa.bitwiseAnd(1 << 4).eq(0))
     kernel = ee.Kernel.gaussian(radius = 10)
-    opened = mask.focalMin(kernel = kernel, iterations = 1)
-    return img.updateMask(opened)
+    mask = mask.focalMin(kernel = kernel, iterations = 1)
+    return img.updateMask(mask)
 
 def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry, scale: int) -> ee.ImageCollection:
     # import the PLASAT dataset and create an land mask
