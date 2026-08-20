@@ -292,7 +292,7 @@ def final_mask(region: ee.Geometry, water_mask: ee.Image) -> ee.Image:
 
 def topo_dem() -> ee.Image:
     fabdem = ee.ImageCollection("projects/sat-io/open-datasets/FABDEM")
-    return fabdem.mosaic().setDefaultProjection('EPSG:3857', null, 30).rename('elev')
+    return fabdem.mosaic().setDefaultProjection('EPSG:3857', None, 30).rename('elev')
 
 def topo_mask(dem: ee.Image, mangs: ee.Image) -> ee.Image:
     mang_elv = dem.select('elev').updateMask(mangs).reduceRegion(
