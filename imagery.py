@@ -183,14 +183,11 @@ def hist_imagery_collection(roi: dict, buff_dist: int) -> Tuple[ee.ImageCollecti
     cont_months, hist_months = get_roi_months(roi)
     return get_imagery_collection(should_landsat(roi, cont_months, hist_months), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), roi.get("inland_mang", False), roi.get("excludes", []), roi["hist_year_start"], roi["hist_year_end"], hist_months)
 
-def get_imagery_collection(landsat: bool, buff_dist: int, indices: List[str], poly: dict, cloud_limit: int, inland_mang: bool, excludes: List[dict], year1: int, year2: int, months: List[int]) -> Tuple[ee.ImageCollection, ee.Geometry, List[str], int]:
-    roi_poly = ee.Geometry(poly)
-    buffered_roi_poly, coast = buffered_coastline(roi_poly, buff_dist, inland_mang, excludes)
-	
+def get_tidal_zone(roi_poly: ee.Geometry) -> ee.Geometry:
     murray = ee.ImageCollection('UQ/murray/Intertidal/v1_1/global_intertidal').mosaic()
     murray = murray.focalMin(1).focalMax(1)
 	
-    zone = murray.reduceToVectors(
+    return murray.reduceToVectors(
         geometry = roi_poly,
         scale = 30,
         crs = murray.projection(),
@@ -199,6 +196,12 @@ def get_imagery_collection(landsat: bool, buff_dist: int, indices: List[str], po
         bestEffort = True,
         maxPixels = 1e13,
     ).filter(ee.Filter.gt('count', 10)).geometry().simplify(75);
+
+def get_imagery_collection(landsat: bool, buff_dist: int, indices: List[str], poly: dict, cloud_limit: int, inland_mang: bool, excludes: List[dict], year1: int, year2: int, months: List[int]) -> Tuple[ee.ImageCollection, ee.Geometry, List[str], int]:
+    roi_poly = ee.Geometry(poly)
+    buffered_roi_poly, coast = buffered_coastline(roi_poly, buff_dist, inland_mang, excludes) 
+
+    zone = get_tidal_zone(roi_poly)
     
     images = None
     scale = None
@@ -463,8 +466,10 @@ def produce_savi(img: ee.Image) -> ee.Image:
 
 def get_combined_sar_water_mask(roi: dict, buf_excl_roi: ee.Geometry) -> ee.Image:
     cont_months, hist_months = get_roi_months(roi)
-    cont_mask = get_sar_water_mask(buf_excl_roi, roi["cont_year_start"], roi["cont_year_end"], cont_months)
-    hist_mask = get_sar_water_mask(buf_excl_roi, roi["hist_year_start"], roi["hist_year_end"], hist_months)
+    roi_poly = roi["polygon"]
+    tidal_zone = get_tidal_zone(roi_poly)
+    cont_mask = get_sar_water_mask(buf_excl_roi, roi["cont_year_start"], roi["cont_year_end"], cont_months, tidal_zone)
+    hist_mask = get_sar_water_mask(buf_excl_roi, roi["hist_year_start"], roi["hist_year_end"], hist_months, tidal_zone)
     return cont_mask.add(hist_mask).gte(1)
 
 # (mask out angles >= 45.23993) */
@@ -478,12 +483,12 @@ def maskAngGT30(image: ee.Image) -> ee.Image:
     ang = image.select(['angle'])
     return image.updateMask(ang.gt(30.63993)).set('system:time_start', image.get('system:time_start'))
 
-def get_sar_water_mask(buf_excl_roi: ee.Geometry, year1: int, year2: int, months: List[int]) -> ee.Image:
-    vv = filter_polarization(buf_excl_roi, year1, year2, months, 'VV', -19)
-    vh = filter_polarization(buf_excl_roi, year1, year2, months, 'VH', -25)
+def get_sar_water_mask(buf_excl_roi: ee.Geometry, year1: int, year2: int, months: List[int], tidal_zone: ee.Geometry) -> ee.Image:
+    vv = filter_polarization(buf_excl_roi, year1, year2, months, 'VV', -19, tidal_zone)
+    vh = filter_polarization(buf_excl_roi, year1, year2, months, 'VH', -25, tidal_zone)
     return vv.add(vh).unmask(1).eq(2)
     
-def filter_polarization(buf_excl_roi: ee.Geometry, year1: int, year2: int, months: List[int], polarization: str, backscatter: int, tidalArea: ee.Geometry) -> ee.Image:
+def filter_polarization(buf_excl_roi: ee.Geometry, year1: int, year2: int, months: List[int], polarization: str, backscatter: int, tidal_zone: ee.Geometry) -> ee.Image:
     def filter_sar_edges(img: ee.Image) -> ee.Image:
         polar = img.select(polarization)
         pos_edge = polar.gte(1.0)
@@ -511,14 +516,14 @@ def filter_polarization(buf_excl_roi: ee.Geometry, year1: int, year2: int, month
     def tidalReduction(img: ee.Image) -> ee.Image:
         count = ee.Image(img).reduceRegion(
                 reducer = ee.Reducer.count(),
-                geometry = tidalArea,
+                geometry = tidal_zone,
                 scale = 100,
                 maxPixels = 1e15,
                 bextEffort = True,
                 tileScale = 0.5
         ).get('Water')
         img = img.set('Land', ee.Algorithms.If(count, ee.Number(count).multiply(-1), -999999))
-        return img.addBands(img.metatdata('Land'))
+        return img.addBands(img.metadata('Land'))
     s1 = s1.map(tidalReduction).qualityMosaic('Land')
     return s1.select('Water').neq(1)
 
