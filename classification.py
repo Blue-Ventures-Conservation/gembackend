@@ -296,7 +296,7 @@ def topo_dem() -> ee.Image:
 
 def topo_mask(dem: ee.Image, mangs: ee.Image) -> ee.Image:
     mang_elv = dem.select('elev').updateMask(mangs).reduceRegion(
-            reducer = ee.Reducer.percentile(percentiles = [99]),
+            reducer = ee.Reducer.percentile(percentiles = [99.5]),
             geometry = mangs.geometry(),
             scale = 30,
             maxPixels = topo_max_pixels,
