@@ -7,7 +7,7 @@ from assets import make_export, asset_dl_timeout
 from roi import coastline, best_buffer
 
 default_cloud_limit = 15  # percent
-default_indices = ["CMRI", "MMRI", "MNDWI", "SAVI"]
+default_indices = ["CMRI", "MMRI", "MNDWI", "SAVI", "NDVI"]
 # B4, B5, B3 false color composite
 imagery_vis = {'bands': ['NIR', 'SWIR1', 'Red'], 'min': 0, 'max': 0.27}
 
@@ -273,6 +273,9 @@ def mosaic_indices(imgs: ee.ImageCollection, buffered_excluded_roi: ee.Geometry,
         elif idx == 'SAVI':
             high_tide = add_savi(high_tide)
             low_tide = add_savi(low_tide)
+        elif idx == 'NDVI':
+            high_tide = add_ndvi(high_tide)
+            low_tide = add_ndvi(low_tide)
     
     return high_tide.float(), low_tide.float(), scale
 
@@ -442,6 +445,9 @@ def add_mmri(img: ee.Image) -> ee.Image:
 
 def add_savi(img: ee.Image) -> ee.Image:
     return img.addBands(produce_savi(img))
+
+def add_ndvi(img: ee.Image) -> ee.Image:
+    return img.addBands(produce_ndvi(img))
 
 def produce_ndvi(img: ee.Image) -> ee.Image:
     return img.expression('(B4 - B3)/(B4 + B3)', {'B4': img.select('NIR'), 'B3': img.select('Red')}).rename(['NDVI'])
