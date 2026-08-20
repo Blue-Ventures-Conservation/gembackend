@@ -467,17 +467,6 @@ def get_combined_sar_water_mask(roi: dict, buf_excl_roi: ee.Geometry) -> ee.Imag
     hist_mask = get_sar_water_mask(buf_excl_roi, roi["hist_year_start"], roi["hist_year_end"], hist_months)
     return cont_mask.add(hist_mask).gte(1)
 
-def filter_sar_edges(img: ee.Image) -> ee.Image:
-    vv = img.select('VV')
-    pos_edge = vv.gte(1.0)
-    neg_edge = vv.lte(-30.0)
-    masked = img.mask().And(neg_edge.Not()).And(pos_edge.Not())
-    return img.updateMask(masked)
-
-def classifyWater(img: ee.Image) -> ee.Image:
-    vv = img.select('VV')
-    return vv.lt(-17).rename('Water')
-
 # (mask out angles >= 45.23993) */
 def maskAngLT452(image: ee.Image) -> ee.Image:
     ang = image.select(['angle'])
@@ -488,21 +477,50 @@ def maskAngLT452(image: ee.Image) -> ee.Image:
 def maskAngGT30(image: ee.Image) -> ee.Image:
     ang = image.select(['angle'])
     return image.updateMask(ang.gt(30.63993)).set('system:time_start', image.get('system:time_start'))
-    
+
 def get_sar_water_mask(buf_excl_roi: ee.Geometry, year1: int, year2: int, months: List[int]) -> ee.Image:
+    vv = filter_polarization(buf_excl_roi, year1, year2, months, 'VV', -19)
+    vh = filter_polarization(buf_excl_roi, year1, year2, months, 'VH', -25)
+    return vv.add(vh).unmask(1).eq(2)
+    
+def filter_polarization(buf_excl_roi: ee.Geometry, year1: int, year2: int, months: List[int], polarization: str, backscatter: int, tidalArea: ee.Geometry) -> ee.Image:
+    def filter_sar_edges(img: ee.Image) -> ee.Image:
+        polar = img.select(polarization)
+        pos_edge = polar.gte(1.0)
+        neg_edge = polar.lte(-30.0)
+        masked = img.mask().And(neg_edge.Not()).And(pos_edge.Not())
+        return img.updateMask(masked)
+    
     y2 = year2 + 1
     s1 = ee.ImageCollection('COPERNICUS/S1_GRD') \
             .filterBounds(buf_excl_roi) \
             .filterDate(f'{year1}-01-01', f'{y2}-01-01') \
-            .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV')) \
+            .filter(ee.Filter.listContains('transmitterReceiverPolarisation', polarization)) \
             .filter(ee.Filter.eq('instrumentMode', 'IW')) \
             .filter(ee.Filter.eq('resolution_meters', 10)) \
             .map(filter_sar_edges)
     
+    def classifyWater(img: ee.Image) -> ee.Image:
+        polar = img.select(polarization)
+        return polar.lt(backscatter).rename('Water')
+
     s1 = filter_months(s1, months)
-    s1 = s1.map(maskAngLT452).map(maskAngGT30).select('VV')
+    s1 = s1.map(maskAngLT452).map(maskAngGT30).select(polarization)
     s1 = s1.map(leeFilter).map(classifyWater)
-    return s1.reduce(ee.Reducer.sum()).gt(1).add(1).eq(1)
+
+    def tidalReduction(img: ee.Image) -> ee.Image:
+        count = ee.Image(img).reduceRegion(
+                reducer = ee.Reducer.count(),
+                geometry = tidalArea,
+                scale = 100,
+                maxPixels = 1e15,
+                bextEffort = True,
+                tileScale = 0.5
+        ).get('Water')
+        img = img.set('Land', ee.Algorithms.If(count, ee.Number(count).multiply(-1), -999999))
+        return img.addBands(img.metatdata('Land'))
+    s1 = s1.map(tidalReduction).qualityMosaic('Land')
+    return s1.select('Water').neq(1)
 
 # lee speckle filter implementation borrowed from:
 # https://github.com/zibnix/gee_s1_ard/blob/main/javascript/speckle_filter.js#L2
