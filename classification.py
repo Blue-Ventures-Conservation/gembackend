@@ -286,27 +286,16 @@ def landsat_water_mask(conts: ee.ImageCollection, hists: ee.ImageCollection, buf
 
 def final_mask(region: ee.Geometry, water_mask: ee.Image) -> ee.Image:
     mangs = known_mangroves().clip(region)
-    tmask = topo_mask(topo_dsm(), mangs)
+    tmask = topo_mask(topo_dem(), mangs)
     
     return water_mask.multiply(tmask).eq(1)
 
-def topo_dsm() -> ee.Image:
-    elev = ee.ImageCollection("JAXA/ALOS/AW3D30/V4_1").select("DSM")
-    proj = elev.first().select(0).projection()
-    dsm = elev.mosaic().setDefaultProjection(proj).rename("elev")
-    slp_img = ee.Terrain.slope(ee.Image(dsm).select("elev")).double().rename("slope")
-    return dsm.addBands(slp_img)
+def topo_dem() -> ee.Image:
+    fabdem = ee.ImageCollection("projects/sat-io/open-datasets/FABDEM")
+    return fabdem.mosaic().setDefaultProjection('EPSG:3857', null, 30).rename('elev')
 
-def topo_mask(dsm: ee.Image, mangs: ee.Image) -> ee.Image:
-    mang_elv = dsm.select('elev').updateMask(mangs).reduceRegion(
-            reducer = ee.Reducer.percentile(percentiles = [99]),
-            geometry = mangs.geometry(),
-            scale = 30,
-            maxPixels = topo_max_pixels,
-            bestEffort = True
-    )
-    
-    mang_slope = dsm.select('slope').updateMask(mangs).reduceRegion(
+def topo_mask(dem: ee.Image, mangs: ee.Image) -> ee.Image:
+    mang_elv = dem.select('elev').updateMask(mangs).reduceRegion(
             reducer = ee.Reducer.percentile(percentiles = [99]),
             geometry = mangs.geometry(),
             scale = 30,
@@ -315,9 +304,8 @@ def topo_mask(dsm: ee.Image, mangs: ee.Image) -> ee.Image:
     )
     
     el_val = ee.Image.constant(mang_elv.get('elev'))
-    slp_val = ee.Image.constant(mang_slope.get('slope'))
     
-    return dsm.select('elev').lte(el_val).And(dsm.select('slope').lte(slp_val)).double()
+    return dem.select('elev').lte(el_val).double()
 
 def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, props: List[str], scale: int, geometries: bool) -> ee.FeatureCollection:
     sample = None
