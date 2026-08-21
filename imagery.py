@@ -555,11 +555,12 @@ def filter_polarization(buf_excl_roi: ee.Geometry, year1: int, year2: int, month
                 geometry = tidal_zone,
                 scale = 100,
                 maxPixels = 1e15,
-                bextEffort = True,
+                bestEffort = True,
                 tileScale = 0.5
         ).get('Water')
         img = img.set('Land', ee.Algorithms.If(count, ee.Number(count).multiply(-1), -999999))
         return img.addBands(img.metadata('Land'))
+    
     s1 = s1.map(tidalReduction).qualityMosaic('Land')
     return s1.select('Water').neq(1)
 
