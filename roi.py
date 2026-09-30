@@ -20,6 +20,7 @@ def geo_coords(geo: ee.Geometry) -> List[list]:
     return ee.Geometry(geo).coordinates()
 
 # poly here should be the dict equivalent of a geojson polygon
+# if the poly doesn't intersect a coastline, it is returned unchanged
 def coastline(roi_poly: ee.Geometry) -> ee.Geometry:
     # mainlands = ee.FeatureCollection('projects/sat-io/open-datasets/shoreline/mainlands')
     # big_islands = ee.FeatureCollection('projects/sat-io/open-datasets/shoreline/big_islands')
@@ -66,13 +67,26 @@ def coastline(roi_poly: ee.Geometry) -> ee.Geometry:
     s19 = ee.Geometry.MultiPoint(area_coords.slice(twentieth.multiply(18), twentieth.multiply(19))).simplify(simp).coordinates()
     s20 = ee.Geometry.MultiPoint(area_coords.slice(twentieth.multiply(19), twentieth.multiply(20))).simplify(simp).coordinates()
     
-    # use the coordinates to create a sting geometry
+    # use the coordinates to create a single geometry
     area_point = ee.Geometry.MultiPoint(ee.List([s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, s16, s17, s18, s19, s20]).flatten())
     
     # select points in roi and convert to coordinate list
-    return area_point.intersection(roi_poly, ee.ErrorMargin(1))
+    coast = area_point.intersection(roi_poly, ee.ErrorMargin(1))
+    return ee.Geometry(ee.Algorithms.If(coast.coordinates().size(), coast, roi_poly))
 
 def best_buffer(poly: dict, excludes: List[dict]) -> int:
+    mang = known_mangroves()
+    pixelCount = mang.rename("groves").reduceRegion(
+            reducer = ee.Reducer.count(),
+            geometry = ee.Geometry(poly),
+            scale = mangroves_scale,
+            maxPixels = mangroves_max_pixels,
+            bestEffort = True
+    ).get("groves").getInfo()
+    
+    if pixelCount == 0:
+        return 0
+    
     sums = area_chart(poly, excludes)["sums"]
     vals = sums["vals"]
     keys = sums["keys"]

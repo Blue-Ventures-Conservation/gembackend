@@ -19,6 +19,8 @@ default_min_avg = -1
 cont_class_asset = "cont_class_{region_uuid}"
 hist_class_asset = "hist_class_{region_uuid}"
 
+elevation_threshold = 39
+slope_threshold = 16
 topo_max_pixels = 1e12
 
 class ClassifierFailed(Exception):
@@ -295,17 +297,17 @@ def topo_dem() -> ee.Image:
     return fabdem.mosaic().setDefaultProjection('EPSG:3857', None, 30).rename('elev')
 
 def topo_mask(dem: ee.Image, mangs: ee.Image) -> ee.Image:
-    mang_elv = dem.select('elev').updateMask(mangs).reduceRegion(
+    el_val = dem.select('elev').updateMask(mangs).reduceRegion(
             reducer = ee.Reducer.percentile(percentiles = [99.5]),
             geometry = mangs.geometry(),
             scale = 30,
             maxPixels = topo_max_pixels,
             bestEffort = True
-    )
+    ).get('elev')
     
-    el_val = ee.Image.constant(mang_elv.get('elev'))
+    el_img = ee.Algorithms.If(el_val, ee.Image.constant(el_val), ee.Image.constant(elevation_threshold))
     
-    return dem.select('elev').lte(el_val).double()
+    return dem.select('elev').lte(el_img).double()
 
 def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, props: List[str], scale: int, geometries: bool) -> ee.FeatureCollection:
     sample = None

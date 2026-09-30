@@ -78,17 +78,19 @@ def visualize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
         "timeout": tile_timeout
     }
 
-def buffered_coastline(roi_poly: ee.Geometry, buff_dist: int, inland: bool, excludes: List[dict]) -> Tuple[ee.Geometry, ee.Geometry]:
+def buffered_coastline(roi_poly: ee.Geometry, buff_dist: int, inland: bool, excludes: List[dict]) -> ee.Geometry:
     coast = coastline(roi_poly)
-    buffed = coast.buffer(buff_dist).intersection(roi_poly)
     
-    if inland == True:
-        buffed = buffed.buffer(buff_dist)
-    
+    if buff_dist > 0:
+        coast = coast.buffer(buff_dist).intersection(roi_poly)
+        
+        if inland == True:
+            coast = coast.buffer(buff_dist)
+        
     for exclude in excludes:
-        buffed = buffed.difference(ee.Geometry(exclude))
+        coast = coast.difference(ee.Geometry(exclude))
     
-    return buffed, coast
+    return coast
 
 def imagery_export(uid: str, vis: bool, roi: dict, buff_dist: int):
     try:
@@ -107,7 +109,7 @@ def imagery_export(uid: str, vis: bool, roi: dict, buff_dist: int):
         chot = chot.visualize(bands = imagery_vis['bands'], min = imagery_vis['min'], max = imagery_vis['max'])
         clot = clot.visualize(bands = imagery_vis['bands'], min = imagery_vis['min'], max = imagery_vis['max'])
     
-    buffered_roi, _ = buffered_coastline(ee.Geometry(roi["polygon"]), buff_dist, roi.get("inland_mang", False), roi.get("excludes", []))
+    buffered_roi = buffered_coastline(ee.Geometry(roi["polygon"]), buff_dist, roi.get("inland_mang", False), roi.get("excludes", []))
     
     hhot_task = make_export(uid, hhot, buffered_roi, "historical_high_tide", scale)
     hlot_task = make_export(uid, hlot, buffered_roi, "historical_low_tide", scale)
@@ -199,7 +201,7 @@ def get_tidal_zone(roi_poly: ee.Geometry) -> ee.Geometry:
 
 def get_imagery_collection(landsat: bool, buff_dist: int, indices: List[str], poly: dict, cloud_limit: int, inland_mang: bool, excludes: List[dict], year1: int, year2: int, months: List[int]) -> Tuple[ee.ImageCollection, ee.Geometry, List[str], int]:
     roi_poly = ee.Geometry(poly)
-    buffered_roi_poly, coast = buffered_coastline(roi_poly, buff_dist, inland_mang, excludes) 
+    buffered_roi_poly = buffered_coastline(roi_poly, buff_dist, inland_mang, excludes)
     
     zone = get_tidal_zone(roi_poly)
     
