@@ -56,8 +56,8 @@ def classification_ready(uid: str, region_uuid: str, roi: dict, buff_dist: int, 
         raise asset_error(e)
 
 def check_for_cached_classification_imagery(uid: str, region_uuid: str) -> Tuple[str, str, ee.Image, ee.Image]:
-    cont, cont_key check_for_cached_image(uid, region_uuid, cont_class_asset)
-    hist, hist_key check_for_cached_image(uid, region_uuid, hist_class_asset)
+    cont, cont_key = check_for_cached_image(uid, region_uuid, cont_class_asset)
+    hist, hist_key = check_for_cached_image(uid, region_uuid, hist_class_asset)
     return cont_key, hist_key, cont, hist
 
 def get_cached_classification_imagery_or_submit(uid: str, region_uuid: str, region: ee.Geometry, prev_cont_op: str, prev_hist_op: str, lazy_cont: ee.Image, lazy_hist: ee.Image, scale: int) -> Tuple[ee.Image, ee.Image, str, str]:

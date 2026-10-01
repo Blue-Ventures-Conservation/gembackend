@@ -54,7 +54,7 @@ class NoContemporaryImages(Exception):
 class NoHistoricalImages(Exception):
     pass
 
-def check_for_cached_composite_imagery(uid: str, region_uuid: str): -> Tuple[str, str, str, str, ee.Image, ee.Image, ee.Image, ee.Image]:
+def check_for_cached_composite_imagery(uid: str, region_uuid: str) -> Tuple[str, str, str, str, ee.Image, ee.Image, ee.Image, ee.Image]:
     chot, chot_key = check_for_cached_image(uid, region_uuid, cont_hot_asset)
     clot, clot_key = check_for_cached_image(uid, region_uuid, cont_lot_asset)
     hhot, hhot_key = check_for_cached_image(uid, region_uuid, hist_hot_asset)
@@ -120,7 +120,7 @@ def visualize_imagery(roi: dict, region_uuid: str, buff_dist: int) -> Dict[str, 
         "hlot_url": hlot_url,
         "buff_dist": buff_dist,
         "created_at": int(time.time()),
-        "timeout": tile_timeout
+        "timeout": tile_timeout,
         "chot_image_op": chot_op,
         "clot_image_op": clot_op,
         "hhot_image_op": hhot_op,
