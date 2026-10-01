@@ -110,7 +110,7 @@ def ls_imagery_route():
 def get_imagery_route():
     try:
         content = request.json
-        visuals = visualize_imagery(content, content.get("buff_dist", -1))
+        visuals = visualize_imagery(content, content.get("region_uuid"), content.get("buff_dist", -1))
     except Exception as e:
         return "", error_check("/get_imagery", content, e)
     
@@ -134,7 +134,7 @@ def export_ls_imagery(uid: str):
 def export_imagery(uid: str):
     try:
         content = request.json
-        data = imagery_export(uid, content["visualize"], content, content["buff_dist"])
+        data = imagery_export(uid, content["visualize"], content, content.get("region_uuid"), content["buff_dist"])
     except Exception as e:
         return "", error_check("/export_imagery", content, e)
     
@@ -170,6 +170,17 @@ def corr_route(uid: str):
         data = correlation_matrix(content["time_period"], uid, content["storage_key"], content["num_label"], content["roi"], content["roi"]["buff_dist"])
     except Exception as e:
         return "", error_check("/correlation_chart", content, e)
+    
+    return jsonify(data)
+
+@app.route("/classification_ready", methods=["POST"])
+@token_check
+def classification_ready_route(uid: str):
+    try:
+        content = request.json
+        data = classification_ready(uid, content["roi"].get("region_uuid", None), content["roi"], content["roi"]["buff_dist"], content["contemporary_high_tide_op"], content["contemporary_low_tide_op"], content["historical_high_tide_op"], content["historical_low_tide_op"])
+    except Exception as e:
+        return "", error_check("classification_ready", content, e)
     
     return jsonify(data)
 

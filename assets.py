@@ -63,6 +63,7 @@ def make_image_assets(uid: str, imgs: List[ee.Image], keys: List[str], region: e
         key = keys[i]
         asset_id = asset_name(uid, key)
         if asset_exists(asset_id):
+            ops.append(None)
             continue
         
         task = ee.batch.Export.image.toAsset(
@@ -179,6 +180,28 @@ def folder_exists(path: str) -> bool:
 
 def asset_name(uid: str, key: str) -> str:
     return asset_users_table_path.format(project_id=project.project_id, uid = uid, key = key)
+
+def check_for_cached_image(uid: str, region_uuid: str, key_fmt: str) -> Tuple[ee.Image, str]:
+    key = key_fmt.format(region_uuid = region_uuid)
+    asset_id = asset_name(uid, key)
+    if asset_exists(asset_id):
+        return ee.Image(asset_id), key
+    else:
+        return None, key
+
+def get_cached_image_or_submit(uid: str, region_uuid: str, key_fmt: str, region: ee.Geometry, prev_op: str, lazy_img: ee.Image, scale: int) -> Tuple[ee.Image, str]:
+    img, key = check_for_cached_image(uid, region_uuid, key_fmt)
+    
+    current_op = prev_op
+    if img is None:
+        succeeded = False
+        err = None
+        if prev_op is not None:
+            succeeded, err = check_operation(prev_op)
+        if prev_op is None or err is not None or (succeeded and check_for_cached_image(uid, key) is None):
+            current_op = make_image_assets(uid, [lazy_img], [key], region, scale)[0]
+    
+    return img, current_op
 
 def delete_asset(name: str) -> bool:
     try:

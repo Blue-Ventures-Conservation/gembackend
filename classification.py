@@ -5,8 +5,8 @@ from typing import List, Tuple, Dict
 
 from project import tile_timeout
 from roi import known_mangroves
-from imagery import should_use_sar, get_combined_sar_water_mask, cont_imagery_collection, hist_imagery_collection, mosaic_indices, produce_mndwi, produce_ndwi
-from assets import MissingAsset, make_export, make_image_assets, asset_name, asset_exists, check_operation, asset_error, training_poly, asset_dl_timeout
+from imagery import should_use_sar, get_combined_sar_water_mask, get_cached_composite_imagery_or_submit, cont_imagery, hist_imagery, cont_imagery_collection, hist_imagery_collection, mosaic_indices, produce_mndwi, produce_ndwi
+from assets import MissingAsset, make_export, make_image_assets, check_for_cached_image, get_cached_image_or_submit, asset_error, training_poly, asset_dl_timeout
 
 trees = 1000
 splits = 1
@@ -26,6 +26,7 @@ topo_max_pixels = 1e12
 class ClassifierFailed(Exception):
     pass
 
+# unused
 def classification_error(e: Exception) -> Exception:
     e = asset_error(e)
     if type(e) is MissingAsset:
@@ -35,39 +36,43 @@ def classification_error(e: Exception) -> Exception:
     else:
         return e
 
-def check_cache(uid: str, key: str) -> ee.Image:
-    asset_id = asset_name(uid, key)
-    if asset_exists(asset_id):
-        return ee.Image(asset_id)
-    else:
-        return None
+def classification_ready(uid: str, region_uuid: str, roi: dict, buff_dist: int, prev_chot_op: str, prev_clot_op: str, prev_hhot_op: str, prev_hlot_op: str) -> dict:
+    try:
+        chot, clot, scale = cont_imagery(roi, buff_dist)
+        hhot, hlot, scale = hist_imagery(roi, buff_dist)
+        chot, clot, hhot, hlot, chot_op, clot_op, hhot_op, hlot_op = get_cached_composite_imagery_or_submit(uid, region_uuid, buf_excl_roi, prev_chot_op, prev_clot_op, prev_hhot_op, prev_hlot_op, chot, clot, hhot, hlot, scale)
+        
+        return {
+            "chot_ready": chot is not None,
+            "clot_ready": clot is not None,
+            "hhot_ready": hhot is not None,
+            "hlot_ready": hlot is not None,
+            "chot_op": chot_op,
+            "clot_op": clot_op,
+            "hhot_op": hhot_op,
+            "hlot_op": hlot_op,
+        }
+    except Exception as e:
+        raise asset_error(e)
 
-def check_for_cached_classified_imagery(uid: str, region_uuid: str) -> Tuple[str, str, ee.Image, ee.Image]:
-    cont_key = cont_class_asset.format(region_uuid = region_uuid)
-    hist_key = hist_class_asset.format(region_uuid = region_uuid)
-    return cont_key, hist_key, check_cache(uid, cont_key), check_cache(uid, hist_key)
+def check_for_cached_classification_imagery(uid: str, region_uuid: str) -> Tuple[str, str, ee.Image, ee.Image]:
+    cont, cont_key check_for_cached_image(uid, region_uuid, cont_class_asset)
+    hist, hist_key check_for_cached_image(uid, region_uuid, hist_class_asset)
+    return cont_key, hist_key, cont, hist
 
-def get_cached_imagery_or_submit(uid: str, region_uuid: str, region: ee.Geometry, prev_cont_op: str, prev_hist_op: str, lazy_cont: ee.Image, lazy_hist: ee.Image, scale: int) -> Tuple[ee.Image, ee.Image, str, str]:
-    cont_key, hist_key, cont, hist = check_for_cached_classified_imagery(uid, region_uuid)
-    
-    cont_op = prev_cont_op
-    if cont is None:
-        succeeded, err = check_operation(prev_cont_op)
-        if err is not None or (succeeded and check_cache(uid, cont_key) is None):
-            cont_op = make_image_assets(uid, [lazy_cont], [cont_key], region, scale)[0]
-    
-    hist_op = prev_hist_op
-    if hist is None:
-        succeeded, err = check_operation(prev_hist_op)
-        if err is not None or (succeeded and check_cache(uid, hist_key) is None):
-            hist_op = make_image_assets(uid, [lazy_hist], [hist_key], region, scale)[0]
+def get_cached_classification_imagery_or_submit(uid: str, region_uuid: str, region: ee.Geometry, prev_cont_op: str, prev_hist_op: str, lazy_cont: ee.Image, lazy_hist: ee.Image, scale: int) -> Tuple[ee.Image, ee.Image, str, str]:
+    cont, cont_op = get_cached_image_or_submit(uid, region_uuid, cont_class_asset, region, prev_cont_op, lazy_cont, scale)
+    hist, hist_op = get_cached_image_or_submit(uid, region_uuid, hist_class_asset, region, prev_hist_op, lazy_hist, scale)
     
     return cont, hist, cont_op, hist_op
 
+# TODO: consider preventing this from succeeding without the classification imagery first being fully exported
+# in order to have consistent visuals, as each re-classification alters the outcome
+# the problem with that is we would need to support keeping those images for a long time
 def classification_export(uid: str, region_uuid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int):
     try:
-        cont_t_poly, hist_t_poly, cont_class, hist_class, _, _, _, _, region, palette, _, _, scale = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)
-        _, _, cont_cached, hist_cached = check_for_cached_classified_imagery(uid, region_uuid)
+        cont_t_poly, hist_t_poly, cont_class, hist_class, _, _, _, _, region, palette, _, _, scale = combined_classification_lazy(uid, region_uuid, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)
+        _, _, cont_cached, hist_cached = check_for_cached_classification_imagery(uid, region_uuid)
         
         if cont_cached is not None:
             cont_class = cont_cached
@@ -95,8 +100,8 @@ def classification_export(uid: str, region_uuid: str, cont_key: str, hist_key: s
 
 def combined_classification(uid: str, region_uuid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int):
     try:
-        cont_t_poly, hist_t_poly, cont_class, hist_class, cont_classifier, hist_classifier, cont_validation, hist_validation, region, palette, _, classes, scale = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)
-        cont_class_key, hist_class_key, cont_cached, hist_cached = check_for_cached_classified_imagery(uid, region_uuid)
+        cont_t_poly, hist_t_poly, cont_class, hist_class, cont_classifier, hist_classifier, cont_validation, hist_validation, region, palette, _, classes, scale = combined_classification_lazy(uid, region_uuid, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)
+        cont_class_key, hist_class_key, cont_cached, hist_cached = check_for_cached_classification_imagery(uid, region_uuid)
         
         if cont_cached is not None:
             cont_class = cont_cached
@@ -107,12 +112,10 @@ def combined_classification(uid: str, region_uuid: str, cont_key: str, hist_key:
         cont_op = ""
         hist_op = ""
         if region_uuid is not None and cont_cached is None and hist_cached is None:
-            cont_ops = make_image_assets(uid, [cont_class], [cont_class_key], region, scale)
-            hist_ops = make_image_assets(uid, [hist_class], [hist_class_key], region, scale)
-            if len(cont_ops) > 0:
-                cont_op = cont_ops[0]
-            if len(hist_ops) > 0:
-                hist_op = hist_ops[0]
+            operations = make_image_assets(uid, [cont_class, hist_class], [cont_class_key, hist_class_key], region, scale)
+            if len(operations) > 0:
+                cont_op = operations[0]
+                hist_op = operations[1]
         
         cont_classification = classify_fully(cont_op, cont_class, cont_classifier, cont_validation, cont_t_poly, num_label, palette)
         hist_classification = classify_fully(hist_op, hist_class, hist_classifier, hist_validation, hist_t_poly, num_label, palette)
@@ -127,8 +130,8 @@ def combined_classification(uid: str, region_uuid: str, cont_key: str, hist_key:
     except Exception as e:
         raise asset_error(e)
 
-def combined_classification_lazy(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.FeatureCollection, ee.FeatureCollection, ee.Image, ee.Image, ee.Classifier, ee.Classifier, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry, List[str], Dict[str, int], List[str], int]:
-    cont_combo, cont_sample, hist_combo, hist_sample, cont_t_poly, hist_t_poly, region, palette, scale = combined_classification_prep(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)
+def combined_classification_lazy(uid: str, region_uuid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.FeatureCollection, ee.FeatureCollection, ee.Image, ee.Image, ee.Classifier, ee.Classifier, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry, List[str], Dict[str, int], List[str], int]:
+    cont_combo, cont_sample, hist_combo, hist_sample, cont_t_poly, hist_t_poly, region, palette, scale = combined_classification_prep(uid, region_uuid, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)
     cont_classes, cont_sorts, cont_class, cont_classifier, _, cont_validation = classify_lazy(cont_combo, cont_sample, cont_t_poly, region, num_label, char_label)
     hist_classes, hist_sorts, hist_class, hist_classifier, _, hist_validation = classify_lazy(hist_combo, hist_sample, hist_t_poly, region, num_label, char_label)
     if cont_classes != hist_classes or cont_sorts != hist_sorts:
@@ -136,7 +139,7 @@ def combined_classification_lazy(uid: str, cont_key: str, hist_key: str, use_con
     
     return cont_t_poly, hist_t_poly, cont_class, hist_class, cont_classifier, hist_classifier, cont_validation, hist_validation, region, palette, cont_sorts, cont_classes, scale
 
-def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry, ee.Geometry, ee.Geometry, ee.List, int]:
+def combined_classification_prep(uid: str, region_uuid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry, ee.Geometry, ee.Geometry, ee.List, int]:
     conts, buf_excl_roi, indices, scale = cont_imagery_collection(roi, buff_dist)
     hists, _, _, _ = hist_imagery_collection(roi, buff_dist)
     
@@ -150,6 +153,12 @@ def combined_classification_prep(uid: str, cont_key: str, hist_key: str, use_con
     
     chot, clot, _ = mosaic_indices(conts, buf_excl_roi, indices, scale)
     hhot, hlot, _ = mosaic_indices(hists, buf_excl_roi, indices, scale)
+    
+    chot, clot, hhot, hlot, _, _, _, _ = get_cached_composite_imagery_or_submit(uid, region_uuid, buf_excl_roi, None, None, None, None, chot, clot, hhot, hlot, scale)
+    
+    if chot is None or clot is None or hhot is None or hlot is None:
+        raise Exception("composite cache unavailable")
+    
     chot = chot.updateMask(fmask)
     clot = clot.updateMask(fmask)
     hhot = hhot.updateMask(fmask)
@@ -258,7 +267,7 @@ def classify_fully(image_op: str, classified: ee.Image, classifier: ee.Classifie
     # Passing the order argument here filters the matrix to remove the sequential rows/cols
     # that aren't actually part of our classification.
     test_accuracy = validated.errorMatrix(num_label, 'classification', order)
-     
+    
     classification_url = classified.getMapId(visual(t_poly, num_label, palette))["tile_fetcher"].url_format
     
     accs = ee.List([train_accuracy.accuracy(), test_accuracy.accuracy()]).getInfo()

@@ -4,13 +4,13 @@ import time
 from typing import Dict, List, Tuple
 
 from project import tile_timeout, aggregation_max_pixels
-from classification import get_cached_imagery_or_submit, combined_classification_lazy
+from classification import get_cached_classification_imagery_or_submit, combined_classification_lazy
 from assets import asset_error, make_export, make_table_export, asset_dl_timeout
 
-def dynamics_ready(uid: str, region_uuid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int, prev_cont_op: str, prev_hist_op: str):
+def dynamics_ready(uid: str, region_uuid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int, prev_cont_op: str, prev_hist_op: str) -> dict:
     try:
-        _, _, cont_lazy, hist_lazy, _, _, _, _, region, _, _, _, scale = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
-        cont, hist, cont_op, hist_op = get_cached_imagery_or_submit(uid, region_uuid, region, prev_cont_op, prev_hist_op, cont_lazy, hist_lazy, scale)
+        _, _, cont_lazy, hist_lazy, _, _, _, _, region, _, _, _, scale = combined_classification_lazy(uid, region_uuid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
+        cont, hist, cont_op, hist_op = get_cached_classification_imagery_or_submit(uid, region_uuid, region, prev_cont_op, prev_hist_op, cont_lazy, hist_lazy, scale)
         
         return {
             "cont_ready": cont is not None,
@@ -21,7 +21,7 @@ def dynamics_ready(uid: str, region_uuid: str, cont_key: str, hist_key: str, use
     except Exception as e:
         raise asset_error(e)
 
-def dynamics_export(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, sub_regions: List[dict], red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
+def dynamics_export(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, sub_regions: List[dict], red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int) -> dict:
     try:
         class_num, _, cont_class, hist_class, region, sortedValues, sortedNames, scale = combine_classes(uid,region_uuid, target_classes, combined_name, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
         classImgs = class_images(cont_class, hist_class, sortedValues)
@@ -53,7 +53,7 @@ def dynamics_export(uid: str, region_uuid: str, target_classes: List[str], combi
     except Exception as e:
         raise asset_error(e)
 
-def get_dynamics(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, sub_regions: List[dict], red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int):
+def get_dynamics(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, sub_regions: List[dict], red: str, green: str, blue: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int) -> dict:
     try:
         class_num, tpos, cont_class, hist_class, roi_geo, sortedValues, sortedNames, scale = combine_classes(uid, region_uuid, target_classes, combined_name, cont_key, hist_key, use_cont_spec, num_label, char_label, roi, buff_dist)
         classImgs = class_images(cont_class, hist_class, sortedValues)
@@ -96,8 +96,8 @@ def class_images(cont_class: ee.Image, hist_class: ee.Image, sortedValues: List[
     return classImgs
 
 def combine_classes(uid: str, region_uuid: str, target_classes: List[str], combined_name: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, roi: dict, buff_dist: int) -> Tuple[int, int, ee.Dictionary, ee.Image, ee.Image, ee.Geometry, List[int], List[str]]:
-    _, _, cont_class, hist_class, _, _, _, _, region, _, sorts, _, scale = combined_classification_lazy(uid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
-    cont_class, hist_class, _, _ = get_cached_imagery_or_submit(uid, region_uuid, region, None, None, cont_class, hist_class, scale)
+    _, _, cont_class, hist_class, _, _, _, _, region, _, sorts, _, scale = combined_classification_lazy(uid, region_uuid, cont_key, hist_key, use_cont_spec, num_label, char_label, None, roi, buff_dist)
+    cont_class, hist_class, _, _ = get_cached_classification_imagery_or_submit(uid, region_uuid, region, None, None, cont_class, hist_class, scale)
     
     if cont_class is None or hist_class is None:
         raise Exception("classification cache unavailable")

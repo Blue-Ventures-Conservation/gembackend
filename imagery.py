@@ -3,7 +3,7 @@ import time
 import math
 from typing import Callable, Dict, List, Tuple
 from project import tile_timeout
-from assets import make_export, asset_dl_timeout
+from assets import make_export, asset_dl_timeout, check_for_cached_image, get_cached_image_or_submit
 from roi import coastline, best_buffer
 
 default_cloud_limit = 15  # percent
@@ -40,6 +40,11 @@ s2_human_bands = bgr + ['RE1', 'RE2', 'RE3'] + nir + ['RE4'] + swirs
 sar_start_year = 2014
 sar_start_month = 10
 
+cont_hot_asset = "cont_hot_{region_uuid}"
+cont_lot_asset = "cont_lot_{region_uuid}"
+hist_hot_asset = "hist_hot_{region_uuid}"
+hist_lot_asset = "hist_lot_{region_uuid}"
+
 class NoImages(Exception):
     pass
 
@@ -49,7 +54,21 @@ class NoContemporaryImages(Exception):
 class NoHistoricalImages(Exception):
     pass
 
-def visualize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
+def check_for_cached_composite_imagery(uid: str, region_uuid: str): -> Tuple[str, str, str, str, ee.Image, ee.Image, ee.Image, ee.Image]:
+    chot, chot_key = check_for_cached_image(uid, region_uuid, cont_hot_asset)
+    clot, clot_key = check_for_cached_image(uid, region_uuid, cont_lot_asset)
+    hhot, hhot_key = check_for_cached_image(uid, region_uuid, hist_hot_asset)
+    hlot, hlot_key = check_for_cached_image(uid, region_uuid, hist_lot_asset)
+    return chot_key, clot_key, hhot_key, hlot_key, chot, clot, hhot, hlot
+
+def get_cached_composite_imagery_or_submit(uid: str, region_uuid: str, region: ee.Geometry, prev_chot_op: str, prev_clot_op: str, prev_hhot_op: str, prev_hlot_op: str, lazy_chot: ee.Image, lazy_clot: ee.Image, lazy_hhot: ee.Image, lazy_hlot: ee.Image, scale: int) -> Tuple[ee.Image, ee.Image, ee.Image, ee.Image, str, str, str, str]:
+    chot, chot_op = get_cached_image_or_submit(uid, region_uuid, cont_hot_asset, region, prev_chot_op, lazy_chot, scale)
+    clot, clot_op = get_cached_image_or_submit(uid, region_uuid, cont_lot_asset, region, prev_clot_op, lazy_clot, scale)
+    hhot, hhot_op = get_cached_image_or_submit(uid, region_uuid, hist_hot_asset, region, prev_hhot_op, lazy_hhot, scale)
+    hlot, hlot_op = get_cached_image_or_submit(uid, region_uuid, hist_lot_asset, region, prev_hlot_op, lazy_hlot, scale)
+    return chot, clot, hhot, hlot, chot_op, clot_op, hhot_op, hlot_op
+
+def visualize_imagery(roi: dict, region_uuid: str, buff_dist: int) -> Dict[str, str]:
     if buff_dist <= 0:
         buff_dist = best_buffer(roi["polygon"], roi["excludes"])
     
@@ -59,9 +78,35 @@ def visualize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
         raise NoHistoricalImages()
     
     try:
-        chot, clot, _ = cont_imagery(roi, buff_dist)
+        chot, clot, scale = cont_imagery(roi, buff_dist)
     except NoImages:
         raise NoContemporaryImages()
+    
+    chot_key, clot_key, hhot_key, hlot_key, chot_cached, clot_cached, hhot_cached, hlot_cached = check_for_cached_composite_imagery(uid, region_uuid)
+    
+    chot_op = ""
+    clot_op = ""
+    hhot_op = ""
+    hlot_op = ""
+    if region_uuid is not None and chot_cached is None and clot_cached is None and hhot_cached is None and hlot_cached is None:
+        operations = make_image_assets(uid, [chot, clot, hhot, hlot], [chot_key, clot_key, hhot_key, hlot_key], region, scale)
+        if len(operations) > 0:
+            chot_op = operations[0]
+            clot_op = operations[1]
+            hhot_op = operations[2]
+            hlot_op = operations[3]
+    
+    if chot_cached is not None:
+        chot = chot_cached
+    
+    if clot_cached is not None:
+        clot = clot_cached
+    
+    if hhot_cached is not None:
+        hhot = hhot_cached
+    
+    if hlot_cached is not None:
+        hlot = hlot_cached
     
     chot_url = chot.getMapId(imagery_vis)["tile_fetcher"].url_format
     clot_url = clot.getMapId(imagery_vis)["tile_fetcher"].url_format
@@ -76,6 +121,10 @@ def visualize_imagery(roi: dict, buff_dist: int) -> Dict[str, str]:
         "buff_dist": buff_dist,
         "created_at": int(time.time()),
         "timeout": tile_timeout
+        "chot_image_op": chot_op,
+        "clot_image_op": clot_op,
+        "hhot_image_op": hhot_op,
+        "hlot_image_op": hlot_op,
     }
 
 def buffered_coastline(roi_poly: ee.Geometry, buff_dist: int, inland: bool, excludes: List[dict]) -> ee.Geometry:
@@ -92,7 +141,7 @@ def buffered_coastline(roi_poly: ee.Geometry, buff_dist: int, inland: bool, excl
     
     return coast
 
-def imagery_export(uid: str, vis: bool, roi: dict, buff_dist: int):
+def imagery_export(uid: str, vis: bool, roi: dict, region_uuid: str, buff_dist: int):
     try:
         hhot, hlot, scale = hist_imagery(roi, buff_dist)
     except NoImages:
@@ -102,6 +151,20 @@ def imagery_export(uid: str, vis: bool, roi: dict, buff_dist: int):
         chot, clot, scale = cont_imagery(roi, buff_dist)
     except NoImages:
         raise NoContemporaryImages()
+
+    _, _, _, _, chot_cached, clot_cached, hhot_cached, hlot_cached = check_for_cached_composite_imagery(uid, region_uuid)
+    
+    if chot_cached is not None:
+        chot = chot_cached
+    
+    if clot_cached is not None:
+        clot = clot_cached
+    
+    if hhot_cached is not None:
+        hhot = hhot_cached
+    
+    if hlot_cached is not None:
+        hlot = hlot_cached
     
     if vis == True:
         hhot = hhot.visualize(bands = imagery_vis['bands'], min = imagery_vis['min'], max = imagery_vis['max'])
