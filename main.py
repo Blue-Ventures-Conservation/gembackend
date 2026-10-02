@@ -95,11 +95,11 @@ def area_chart_route():
 # deprecated
 @app.route("/ls_imagery", methods=["POST"])
 @token_check
-def ls_imagery_route():
+def ls_imagery_route(uid: str):
     try:
         content = request.json
         content["force_landsat"] = True
-        visuals = visualize_imagery(content, content["buff_dist"])
+        visuals = visualize_imagery(uid, content, content["buff_dist"])
     except Exception as e:
         return "", error_check("/ls_imagery", content, e)
     
@@ -107,10 +107,10 @@ def ls_imagery_route():
 
 @app.route("/get_imagery", methods=["POST"])
 @token_check
-def get_imagery_route():
+def get_imagery_route(uid: str):
     try:
         content = request.json
-        visuals = visualize_imagery(content, content.get("region_uuid"), content.get("buff_dist", -1))
+        visuals = visualize_imagery(uid, content, content.get("region_uuid"), content.get("buff_dist", -1))
     except Exception as e:
         return "", error_check("/get_imagery", content, e)
     

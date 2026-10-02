@@ -3,7 +3,7 @@ import time
 import math
 from typing import Callable, Dict, List, Tuple
 from project import tile_timeout
-from assets import make_export, asset_dl_timeout, check_for_cached_image, get_cached_image_or_submit
+from assets import make_export, make_image_assets, asset_dl_timeout, check_for_cached_image, get_cached_image_or_submit
 from roi import coastline, best_buffer
 
 default_cloud_limit = 15  # percent
@@ -68,17 +68,17 @@ def get_cached_composite_imagery_or_submit(uid: str, region_uuid: str, region: e
     hlot, hlot_op = get_cached_image_or_submit(uid, region_uuid, hist_lot_asset, region, prev_hlot_op, lazy_hlot, scale)
     return chot, clot, hhot, hlot, chot_op, clot_op, hhot_op, hlot_op
 
-def visualize_imagery(roi: dict, region_uuid: str, buff_dist: int) -> Dict[str, str]:
+def visualize_imagery(uid: str, roi: dict, region_uuid: str, buff_dist: int) -> Dict[str, str]:
     if buff_dist <= 0:
         buff_dist = best_buffer(roi["polygon"], roi["excludes"])
     
     try:
-        hhot, hlot, _ = hist_imagery(roi, buff_dist)
+        hhot, hlot, _, _ = hist_imagery(roi, buff_dist)
     except NoImages:
         raise NoHistoricalImages()
     
     try:
-        chot, clot, scale = cont_imagery(roi, buff_dist)
+        chot, clot, buffered_excluded_roi, scale = cont_imagery(roi, buff_dist)
     except NoImages:
         raise NoContemporaryImages()
     
@@ -89,7 +89,7 @@ def visualize_imagery(roi: dict, region_uuid: str, buff_dist: int) -> Dict[str, 
     hhot_op = ""
     hlot_op = ""
     if region_uuid is not None and chot_cached is None and clot_cached is None and hhot_cached is None and hlot_cached is None:
-        operations = make_image_assets(uid, [chot, clot, hhot, hlot], [chot_key, clot_key, hhot_key, hlot_key], region, scale)
+        operations = make_image_assets(uid, [chot, clot, hhot, hlot], [chot_key, clot_key, hhot_key, hlot_key], buffered_excluded_roi, scale)
         if len(operations) > 0:
             chot_op = operations[0]
             clot_op = operations[1]
@@ -232,11 +232,11 @@ def should_landsat(roi: dict, cont_months: List[int], hist_months: List[int]) ->
 def get_cloud_limit(roi: dict) -> int:
     return roi.get("cloud_limit", default_cloud_limit)
 
-def cont_imagery(roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, int]:
+def cont_imagery(roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.Geometry, int]:
     cont_months, hist_months = get_roi_months(roi)
     return get_imagery(should_landsat(roi, cont_months, hist_months), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), roi.get("inland_mang", False), roi.get("excludes", []), roi["cont_year_start"], roi["cont_year_end"], cont_months)
  
-def hist_imagery(roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, int]:
+def hist_imagery(roi: dict, buff_dist: int) -> Tuple[ee.Image, ee.Image, ee.Geometry, int]:
     cont_months, hist_months = get_roi_months(roi)
     return get_imagery(should_landsat(roi, cont_months, hist_months), buff_dist, roi.get("indices", default_indices), roi["polygon"], get_cloud_limit(roi), roi.get("inland_mang", False), roi.get("excludes", []), roi["hist_year_start"], roi["hist_year_end"], hist_months)
 
@@ -319,11 +319,11 @@ def get_sentinel2_imagery(buffered_roi: ee.Geometry, cloud_limit: int, year1: in
     imgs = shore_refl(imgs, tidal_zone, buffered_roi, s2_scale)
     return s2_cloud_mask(imgs).select(s2_human_bands + tide_band_names)
 
-def get_imagery(landsat: bool, buff_dist: int, indices: List[str], poly: dict, cloud_limit: int, inland_mang: bool, excludes: List[dict], year1: int, year2: int, months: List[int]) -> Tuple[ee.Image, ee.Image, int]:
+def get_imagery(landsat: bool, buff_dist: int, indices: List[str], poly: dict, cloud_limit: int, inland_mang: bool, excludes: List[dict], year1: int, year2: int, months: List[int]) -> Tuple[ee.Image, ee.Image, ee.Geometry, int]:
     imgs, buf_excl_roi, indices, scale = get_imagery_collection(landsat, buff_dist, indices, poly, cloud_limit, inland_mang, excludes, year1, year2, months)
     return mosaic_indices(imgs, buf_excl_roi, indices, scale)
 
-def mosaic_indices(imgs: ee.ImageCollection, buffered_excluded_roi: ee.Geometry, indices: List[str], scale: int) -> Tuple[ee.Image, ee.Image, int]:
+def mosaic_indices(imgs: ee.ImageCollection, buffered_excluded_roi: ee.Geometry, indices: List[str], scale: int) -> Tuple[ee.Image, ee.Image, ee.Geometry, int]:
     high_tide = ee.ImageCollection(imgs).qualityMosaic("MNDWI")
     low_tide = ee.ImageCollection(imgs).qualityMosaic("inv_MNDWI")
     
@@ -349,7 +349,7 @@ def mosaic_indices(imgs: ee.ImageCollection, buffered_excluded_roi: ee.Geometry,
             high_tide = add_ndvi(high_tide)
             low_tide = add_ndvi(low_tide)
     
-    return high_tide.float(), low_tide.float(), scale
+    return high_tide.float(), low_tide.float(), buffered_excluded_roi, scale
 
 def sentinel2_imagery(poly: ee.Geometry, cloud_limit: int, year1: int, year2: int, months: List[int]) -> ee.ImageCollection:
     return filter_collection(s2_dataset, poly, s2_cloud_property, cloud_limit, year1, year2, months)

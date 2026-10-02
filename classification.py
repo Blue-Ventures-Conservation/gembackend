@@ -38,8 +38,8 @@ def classification_error(e: Exception) -> Exception:
 
 def classification_ready(uid: str, region_uuid: str, roi: dict, buff_dist: int, prev_chot_op: str, prev_clot_op: str, prev_hhot_op: str, prev_hlot_op: str) -> dict:
     try:
-        chot, clot, scale = cont_imagery(roi, buff_dist)
-        hhot, hlot, scale = hist_imagery(roi, buff_dist)
+        chot, clot, buf_excl_roi, scale = cont_imagery(roi, buff_dist)
+        hhot, hlot, _, _  = hist_imagery(roi, buff_dist)
         chot, clot, hhot, hlot, chot_op, clot_op, hhot_op, hlot_op = get_cached_composite_imagery_or_submit(uid, region_uuid, buf_excl_roi, prev_chot_op, prev_clot_op, prev_hhot_op, prev_hlot_op, chot, clot, hhot, hlot, scale)
         
         return {
@@ -151,8 +151,8 @@ def combined_classification_prep(uid: str, region_uuid: str, cont_key: str, hist
     
     fmask = final_mask(buf_excl_roi, water_mask)
     
-    chot, clot, _ = mosaic_indices(conts, buf_excl_roi, indices, scale)
-    hhot, hlot, _ = mosaic_indices(hists, buf_excl_roi, indices, scale)
+    chot, clot, _, _ = mosaic_indices(conts, buf_excl_roi, indices, scale)
+    hhot, hlot, _, _ = mosaic_indices(hists, buf_excl_roi, indices, scale)
     
     chot, clot, hhot, hlot, _, _, _, _ = get_cached_composite_imagery_or_submit(uid, region_uuid, buf_excl_roi, None, None, None, None, chot, clot, hhot, hlot, scale)
     
