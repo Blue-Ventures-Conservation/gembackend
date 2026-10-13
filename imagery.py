@@ -4,12 +4,13 @@ import math
 from typing import Callable, Dict, List, Tuple
 from project import tile_timeout
 from assets import make_export, make_image_assets, asset_dl_timeout, check_for_cached_image, get_cached_image_or_submit
-from roi import coastline, best_buffer
+from roi import known_mangroves, coastline, best_buffer
 
 default_cloud_limit = 15  # percent
 default_indices = ["CMRI", "MMRI", "MNDWI", "SAVI", "NDVI"]
 # B4, B5, B3 false color composite
 imagery_vis = {'bands': ['NIR', 'SWIR1', 'Red'], 'min': 0, 'max': 0.27}
+mask_vis = {'min': 0, 'max': 1}
 
 ls4_dataset = "LANDSAT/LT04/C02/T1_L2"
 ls5_dataset = "LANDSAT/LT05/C02/T1_L2"
@@ -39,6 +40,9 @@ s2_human_bands = bgr + ['RE1', 'RE2', 'RE3'] + nir + ['RE4'] + swirs
 
 sar_start_year = 2014
 sar_start_month = 10
+topo_max_pixels = 1e12
+elevation_threshold = 39
+slope_threshold = 16
 
 cont_hot_asset = "cont_hot_{region_uuid}"
 cont_lot_asset = "cont_lot_{region_uuid}"
@@ -73,14 +77,19 @@ def visualize_imagery(uid: str, roi: dict, region_uuid: str, buff_dist: int) -> 
         buff_dist = best_buffer(roi["polygon"], roi["excludes"])
     
     try:
-        hhot, hlot, _, _ = hist_imagery(roi, buff_dist)
+        hists, _, _, _ = hist_imagery_collection(roi, buff_dist)
     except NoImages:
         raise NoHistoricalImages()
     
     try:
-        chot, clot, buffered_excluded_roi, scale = cont_imagery(roi, buff_dist)
+        conts, buf_excl_roi, indices, scale = cont_imagery_collection(roi, buff_dist)
     except NoImages:
         raise NoContemporaryImages()
+    
+    fmask = final_mask(roi, buf_excl_roi, conts, hists)
+    
+    chot, clot, _, _ = mosaic_indices(conts, buf_excl_roi, indices, scale)
+    hhot, hlot, _, _ = mosaic_indices(hists, buf_excl_roi, indices, scale)
     
     chot_key, clot_key, hhot_key, hlot_key, chot_cached, clot_cached, hhot_cached, hlot_cached = check_for_cached_composite_imagery(uid, region_uuid)
     
@@ -112,12 +121,14 @@ def visualize_imagery(uid: str, roi: dict, region_uuid: str, buff_dist: int) -> 
     clot_url = clot.getMapId(imagery_vis)["tile_fetcher"].url_format
     hhot_url = hhot.getMapId(imagery_vis)["tile_fetcher"].url_format
     hlot_url = hlot.getMapId(imagery_vis)["tile_fetcher"].url_format
+    final_mask_url = fmask.getMapId(mask_vis)["tile_fetcher"].url_format
     
     return {
         "chot_url": chot_url,
         "clot_url": clot_url,
         "hhot_url": hhot_url,
         "hlot_url": hlot_url,
+        "final_mask_url": final_mask_url,
         "buff_dist": buff_dist,
         "created_at": int(time.time()),
         "timeout": tile_timeout,
@@ -125,6 +136,7 @@ def visualize_imagery(uid: str, roi: dict, region_uuid: str, buff_dist: int) -> 
         "clot_image_op": clot_op,
         "hhot_image_op": hhot_op,
         "hlot_image_op": hlot_op,
+        "area_of_focus": ee.Geometry(ee.Geometry.MultiPolygon(buf_excl_roi.transform().coordinates()).getInfo()).toGeoJSON()
     }
 
 def buffered_coastline(roi_poly: ee.Geometry, buff_dist: int, inland: bool, excludes: List[dict]) -> ee.Geometry:
@@ -573,6 +585,51 @@ def get_combined_sar_water_mask(roi: dict, buf_excl_roi: ee.Geometry) -> ee.Imag
     hist_mask = get_sar_water_mask(buf_excl_roi, roi["hist_year_start"], roi["hist_year_end"], hist_months, tidal_zone)
     return cont_mask.add(hist_mask).gte(1)
 
+def landsat_water_mask(conts: ee.ImageCollection, hists: ee.ImageCollection, buf_excl_roi: ee.Geometry) -> ee.Image:
+    min_avg = default_min_avg
+    clot = ee.ImageCollection(conts).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
+    hlot = ee.ImageCollection(hists).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
+    
+    mndwi_cont = produce_mndwi(clot).lt(0.09)
+    ndwi_cont = produce_ndwi(clot).lt(0.20)
+    cont_water = mndwi_cont.add(ndwi_cont).gt(1)
+    
+    mndwi_hist = produce_mndwi(hlot).lt(0.09)
+    ndwi_hist = produce_ndwi(hlot).lt(0.20)
+    hist_water = mndwi_hist.add(ndwi_hist).gt(1)
+    
+    h2o_mask = cont_water.add(hist_water).gte(1)
+    return h2o_mask
+
+def final_mask(roi: dict, buf_excl_roi: ee.Geometry, conts: ee.ImageCollection, hists: ee.ImageCollection) -> ee.Image:
+    water_mask = None
+    if should_use_sar(roi):
+        water_mask = get_combined_sar_water_mask(roi, buf_excl_roi)
+    else:
+        water_mask = landsat_water_mask(conts, hists, buf_excl_roi)
+    
+    mangs = known_mangroves().clip(buf_excl_roi)
+    tmask = topo_mask(topo_dem(), mangs)
+    
+    return water_mask.multiply(tmask).eq(1)
+
+def topo_dem() -> ee.Image:
+    fabdem = ee.ImageCollection("projects/sat-io/open-datasets/FABDEM")
+    return fabdem.mosaic().setDefaultProjection('EPSG:3857', None, 30).rename('elev')
+
+def topo_mask(dem: ee.Image, mangs: ee.Image) -> ee.Image:
+    el_val = dem.select('elev').updateMask(mangs).reduceRegion(
+            reducer = ee.Reducer.percentile(percentiles = [99.5]),
+            geometry = mangs.geometry(),
+            scale = 30,
+            maxPixels = topo_max_pixels,
+            bestEffort = True
+    ).get('elev')
+    
+    el_img = ee.Algorithms.If(el_val, ee.Image.constant(el_val), ee.Image.constant(elevation_threshold))
+    
+    return dem.select('elev').lte(el_img).double()
+
 # (mask out angles >= 45.23993) */
 def maskAngLT452(image: ee.Image) -> ee.Image:
     ang = image.select(['angle'])
@@ -587,7 +644,7 @@ def maskAngGT30(image: ee.Image) -> ee.Image:
 def get_sar_water_mask(buf_excl_roi: ee.Geometry, year1: int, year2: int, months: List[int], tidal_zone: ee.Geometry) -> ee.Image:
     vv = filter_polarization(buf_excl_roi, year1, year2, months, 'VV', -19, tidal_zone)
     vh = filter_polarization(buf_excl_roi, year1, year2, months, 'VH', -25, tidal_zone)
-    return vv.add(vh).unmask(1).eq(2)
+    return vv.add(vh).unmask(1).eq(2).clip(buf_excl_roi)
     
 def filter_polarization(buf_excl_roi: ee.Geometry, year1: int, year2: int, months: List[int], polarization: str, backscatter: int, tidal_zone: ee.Geometry) -> ee.Image:
     def filter_sar_edges(img: ee.Image) -> ee.Image:

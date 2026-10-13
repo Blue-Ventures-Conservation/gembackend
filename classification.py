@@ -5,7 +5,7 @@ from typing import List, Tuple, Dict
 
 from project import tile_timeout
 from roi import known_mangroves
-from imagery import should_use_sar, get_combined_sar_water_mask, get_cached_composite_imagery_or_submit, cont_imagery, hist_imagery, cont_imagery_collection, hist_imagery_collection, mosaic_indices, produce_mndwi, produce_ndwi
+from imagery import final_mask, get_cached_composite_imagery_or_submit, cont_imagery, hist_imagery, cont_imagery_collection, hist_imagery_collection, mosaic_indices
 from assets import MissingAsset, make_export, make_image_assets, check_for_cached_image, get_cached_image_or_submit, asset_error, training_poly, asset_dl_timeout
 
 trees = 1000
@@ -18,10 +18,6 @@ default_min_avg = -1
 
 cont_class_asset = "cont_class_{region_uuid}"
 hist_class_asset = "hist_class_{region_uuid}"
-
-elevation_threshold = 39
-slope_threshold = 16
-topo_max_pixels = 1e12
 
 class ClassifierFailed(Exception):
     pass
@@ -143,13 +139,7 @@ def combined_classification_prep(uid: str, region_uuid: str, cont_key: str, hist
     conts, buf_excl_roi, indices, scale = cont_imagery_collection(roi, buff_dist)
     hists, _, _, _ = hist_imagery_collection(roi, buff_dist)
     
-    water_mask = None
-    if should_use_sar(roi):
-        water_mask = get_combined_sar_water_mask(roi, buf_excl_roi)
-    else:
-        water_mask = landsat_water_mask(conts, hists, buf_excl_roi)
-    
-    fmask = final_mask(buf_excl_roi, water_mask)
+    fmask = final_mask(roi, buf_excl_roi, conts, hists)
     
     chot, clot, _, _ = mosaic_indices(conts, buf_excl_roi, indices, scale)
     hhot, hlot, _, _ = mosaic_indices(hists, buf_excl_roi, indices, scale)
@@ -278,45 +268,6 @@ def classify_fully(image_op: str, classified: ee.Image, classifier: ee.Classifie
         "validation_accuracy": float(accs[1]),
         "image_op": image_op,
     }
-
-def landsat_water_mask(conts: ee.ImageCollection, hists: ee.ImageCollection, buf_excl_roi: ee.Geometry) -> ee.Image:
-    min_avg = default_min_avg
-    clot = ee.ImageCollection(conts).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
-    hlot = ee.ImageCollection(hists).filter(ee.Filter.gte('MNDWI', min_avg)).qualityMosaic('inv_MNDWI').clip(buf_excl_roi)
-    
-    mndwi_cont = produce_mndwi(clot).lt(0.09)
-    ndwi_cont = produce_ndwi(clot).lt(0.20)
-    cont_water = mndwi_cont.add(ndwi_cont).gt(1)
-    
-    mndwi_hist = produce_mndwi(hlot).lt(0.09)
-    ndwi_hist = produce_ndwi(hlot).lt(0.20)
-    hist_water = mndwi_hist.add(ndwi_hist).gt(1)
-    
-    h2o_mask = cont_water.add(hist_water).gte(1)
-    return h2o_mask
-
-def final_mask(region: ee.Geometry, water_mask: ee.Image) -> ee.Image:
-    mangs = known_mangroves().clip(region)
-    tmask = topo_mask(topo_dem(), mangs)
-    
-    return water_mask.multiply(tmask).eq(1)
-
-def topo_dem() -> ee.Image:
-    fabdem = ee.ImageCollection("projects/sat-io/open-datasets/FABDEM")
-    return fabdem.mosaic().setDefaultProjection('EPSG:3857', None, 30).rename('elev')
-
-def topo_mask(dem: ee.Image, mangs: ee.Image) -> ee.Image:
-    el_val = dem.select('elev').updateMask(mangs).reduceRegion(
-            reducer = ee.Reducer.percentile(percentiles = [99.5]),
-            geometry = mangs.geometry(),
-            scale = 30,
-            maxPixels = topo_max_pixels,
-            bestEffort = True
-    ).get('elev')
-    
-    el_img = ee.Algorithms.If(el_val, ee.Image.constant(el_val), ee.Image.constant(elevation_threshold))
-    
-    return dem.select('elev').lte(el_img).double()
 
 def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, props: List[str], scale: int, geometries: bool) -> ee.FeatureCollection:
     sample = None
