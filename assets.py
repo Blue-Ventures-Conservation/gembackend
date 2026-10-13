@@ -198,7 +198,7 @@ def get_cached_image_or_submit(uid: str, region_uuid: str, key_fmt: str, region:
         err = None
         if prev_op is not None and prev_op != "" and prev_op != "unknown":
             succeeded, err = check_operation(prev_op)
-        if prev_op is None or err is not None or (succeeded and check_for_cached_image(uid, key) is None):
+        if prev_op is None or prev_op == "" or err is not None or (succeeded and check_for_cached_image(uid, key) is None):
             current_op = make_image_assets(uid, [lazy_img], [key], region, scale)[0]
     
     if current_op is None:

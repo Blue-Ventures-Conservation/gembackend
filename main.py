@@ -178,7 +178,7 @@ def corr_route(uid: str):
 def classification_ready_route(uid: str):
     try:
         content = request.json
-        data = classification_ready(uid, content["roi"].get("region_uuid", None), content["roi"], content["roi"]["buff_dist"], content["contemporary_high_tide_op"], content["contemporary_low_tide_op"], content["historical_high_tide_op"], content["historical_low_tide_op"])
+        data = classification_ready(uid, content["roi"].get("region_uuid", None), content["roi"], content["roi"]["buff_dist"], content["contemporary_high_tide_op"], content["contemporary_low_tide_op"], content["historical_high_tide_op"], content["historical_low_tide_op"], content["final_mask_op"])
     except Exception as e:
         return "", error_check("classification_ready", content, e)
     

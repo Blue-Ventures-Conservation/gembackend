@@ -32,21 +32,26 @@ def classification_error(e: Exception) -> Exception:
     else:
         return e
 
-def classification_ready(uid: str, region_uuid: str, roi: dict, buff_dist: int, prev_chot_op: str, prev_clot_op: str, prev_hhot_op: str, prev_hlot_op: str) -> dict:
+def classification_ready(uid: str, region_uuid: str, roi: dict, buff_dist: int, prev_chot_op: str, prev_clot_op: str, prev_hhot_op: str, prev_hlot_op: str, prev_fmask_op: str) -> dict:
     try:
-        chot, clot, buf_excl_roi, scale = cont_imagery(roi, buff_dist)
-        hhot, hlot, _, _  = hist_imagery(roi, buff_dist)
-        chot, clot, hhot, hlot, chot_op, clot_op, hhot_op, hlot_op = get_cached_composite_imagery_or_submit(uid, region_uuid, buf_excl_roi, prev_chot_op, prev_clot_op, prev_hhot_op, prev_hlot_op, chot, clot, hhot, hlot, scale)
+        conts, buf_excl_roi, indices, scale = cont_imagery_collection(roi, buff_dist)
+        hists, _, _, _ = hist_imagery_collection(roi, buff_dist)
+        fmask = final_mask(roi, buf_excl_roi, conts, hists)
+        chot, clot, _, _ = mosaic_indices(conts, buf_excl_roi, indices, scale)
+        hhot, hlot, _, _ = mosaic_indices(hists, buf_excl_roi, indices, scale)
+        chot, clot, hhot, hlot, fmask, chot_op, clot_op, hhot_op, hlot_op, fmask_op = get_cached_composite_imagery_or_submit(uid, region_uuid, buf_excl_roi, prev_chot_op, prev_clot_op, prev_hhot_op, prev_hlot_op, prev_fmask_op, chot, clot, hhot, hlot, fmask, scale)
         
         return {
             "chot_ready": chot is not None,
             "clot_ready": clot is not None,
             "hhot_ready": hhot is not None,
             "hlot_ready": hlot is not None,
+            "final_mask_ready": fmask is not None,
             "chot_op": chot_op,
             "clot_op": clot_op,
             "hhot_op": hhot_op,
             "hlot_op": hlot_op,
+            "final_mask_op": fmask_op,
         }
     except Exception as e:
         raise asset_error(e)
@@ -144,9 +149,9 @@ def combined_classification_prep(uid: str, region_uuid: str, cont_key: str, hist
     chot, clot, _, _ = mosaic_indices(conts, buf_excl_roi, indices, scale)
     hhot, hlot, _, _ = mosaic_indices(hists, buf_excl_roi, indices, scale)
     
-    chot, clot, hhot, hlot, _, _, _, _ = get_cached_composite_imagery_or_submit(uid, region_uuid, buf_excl_roi, None, None, None, None, chot, clot, hhot, hlot, scale)
+    chot, clot, hhot, hlot, fmask,  _, _, _, _ = get_cached_composite_imagery_or_submit(uid, region_uuid, buf_excl_roi, None, None, None, None, None, chot, clot, hhot, hlot, fmask, scale)
     
-    if chot is None or clot is None or hhot is None or hlot is None:
+    if chot is None or clot is None or hhot is None or hlot is None or fmask is None:
         raise Exception("composite cache unavailable")
     
     chot = chot.updateMask(fmask)

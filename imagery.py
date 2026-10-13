@@ -48,6 +48,7 @@ cont_hot_asset = "cont_hot_{region_uuid}"
 cont_lot_asset = "cont_lot_{region_uuid}"
 hist_hot_asset = "hist_hot_{region_uuid}"
 hist_lot_asset = "hist_lot_{region_uuid}"
+final_mask_asset = "final_mask_{region_uuid}"
 
 class NoImages(Exception):
     pass
@@ -58,19 +59,21 @@ class NoContemporaryImages(Exception):
 class NoHistoricalImages(Exception):
     pass
 
-def check_for_cached_composite_imagery(uid: str, region_uuid: str) -> Tuple[str, str, str, str, ee.Image, ee.Image, ee.Image, ee.Image]:
+def check_for_cached_composite_imagery(uid: str, region_uuid: str) -> Tuple[str, str, str, str, str, ee.Image, ee.Image, ee.Image, ee.Image, ee.Image]:
     chot, chot_key = check_for_cached_image(uid, region_uuid, cont_hot_asset)
     clot, clot_key = check_for_cached_image(uid, region_uuid, cont_lot_asset)
     hhot, hhot_key = check_for_cached_image(uid, region_uuid, hist_hot_asset)
     hlot, hlot_key = check_for_cached_image(uid, region_uuid, hist_lot_asset)
-    return chot_key, clot_key, hhot_key, hlot_key, chot, clot, hhot, hlot
+    fmask, fmask_key = check_for_cached_image(uid, region_uuid, final_mask_asset)
+    return chot_key, clot_key, hhot_key, hlot_key, fmask_key, chot, clot, hhot, hlot, fmask
 
-def get_cached_composite_imagery_or_submit(uid: str, region_uuid: str, region: ee.Geometry, prev_chot_op: str, prev_clot_op: str, prev_hhot_op: str, prev_hlot_op: str, lazy_chot: ee.Image, lazy_clot: ee.Image, lazy_hhot: ee.Image, lazy_hlot: ee.Image, scale: int) -> Tuple[ee.Image, ee.Image, ee.Image, ee.Image, str, str, str, str]:
+def get_cached_composite_imagery_or_submit(uid: str, region_uuid: str, region: ee.Geometry, prev_chot_op: str, prev_clot_op: str, prev_hhot_op: str, prev_hlot_op: str, prev_fmask_op: str, lazy_chot: ee.Image, lazy_clot: ee.Image, lazy_hhot: ee.Image, lazy_hlot: ee.Image, lazy_fmask: ee.Image, scale: int) -> Tuple[ee.Image, ee.Image, ee.Image, ee.Image, ee.Image, str, str, str, str, str]:
     chot, chot_op = get_cached_image_or_submit(uid, region_uuid, cont_hot_asset, region, prev_chot_op, lazy_chot, scale)
     clot, clot_op = get_cached_image_or_submit(uid, region_uuid, cont_lot_asset, region, prev_clot_op, lazy_clot, scale)
     hhot, hhot_op = get_cached_image_or_submit(uid, region_uuid, hist_hot_asset, region, prev_hhot_op, lazy_hhot, scale)
     hlot, hlot_op = get_cached_image_or_submit(uid, region_uuid, hist_lot_asset, region, prev_hlot_op, lazy_hlot, scale)
-    return chot, clot, hhot, hlot, chot_op, clot_op, hhot_op, hlot_op
+    fmask, fmask_op = get_cached_image_or_submit(uid, region_uuid, final_mask_asset, region, prev_fmask_op, lazy_fmask, scale)
+    return chot, clot, hhot, hlot, fmask, chot_op, clot_op, hhot_op, hlot_op, fmask_op
 
 def visualize_imagery(uid: str, roi: dict, region_uuid: str, buff_dist: int) -> Dict[str, str]:
     if buff_dist <= 0:
@@ -91,19 +94,51 @@ def visualize_imagery(uid: str, roi: dict, region_uuid: str, buff_dist: int) -> 
     chot, clot, _, _ = mosaic_indices(conts, buf_excl_roi, indices, scale)
     hhot, hlot, _, _ = mosaic_indices(hists, buf_excl_roi, indices, scale)
     
-    chot_key, clot_key, hhot_key, hlot_key, chot_cached, clot_cached, hhot_cached, hlot_cached = check_for_cached_composite_imagery(uid, region_uuid)
+    chot_key, clot_key, hhot_key, hlot_key, fmask_key, chot_cached, clot_cached, hhot_cached, hlot_cached, fmask_cached = check_for_cached_composite_imagery(uid, region_uuid)
     
     chot_op = ""
     clot_op = ""
     hhot_op = ""
     hlot_op = ""
-    if region_uuid is not None and chot_cached is None and clot_cached is None and hhot_cached is None and hlot_cached is None:
-        operations = make_image_assets(uid, [chot, clot, hhot, hlot], [chot_key, clot_key, hhot_key, hlot_key], buffered_excluded_roi, scale)
-        if len(operations) > 0:
-            chot_op = operations[0]
-            clot_op = operations[1]
-            hhot_op = operations[2]
-            hlot_op = operations[3]
+    fmask_op = ""
+    
+    def set_chot_op(op: str):
+        nonlocal chot_op
+        chot_op = op
+    
+    def set_clot_op(op: str):
+        nonlocal clot_op
+        clot_op = op
+    
+    def set_hhot_op(op: str):
+        nonlocal hhot_op
+        hhot_op = op
+    
+    def set_hlot_op(op: str):
+        nonlocal hlot_op
+        hlot_op = op
+    
+    def set_fmask_op(op: str):
+        nonlocal fmask_op
+        fmask_op = op
+    
+    caches = [chot_cached, clot_cached, hhot_cached, hlot_cached, fmask_cached]
+    images = [chot, clot, hhot, hlot, fmask]
+    keys = [chot_key, clot_key, hhot_key, hlot_key, fmask_key]
+    op_setters = [set_chot_op, set_clot_op, set_hhot_op, set_hlot_op, set_fmask_op]
+    asset_images = []
+    asset_keys = []
+    asset_op_setters = []
+    for index, cache in enumerate(caches):
+        if cache is None:
+            asset_images.append(images[index])
+            asset_keys.append(keys[index])
+            asset_op_setters.append(op_setters[index])
+    
+    if region_uuid is not None and len(asset_images) > 0:
+        operations = make_image_assets(uid, asset_images, asset_keys, buf_excl_roi, scale)
+        for j, op in enumerate(operations):
+            asset_op_setters[j](op)
     
     if chot_cached is not None:
         chot = chot_cached
@@ -116,6 +151,9 @@ def visualize_imagery(uid: str, roi: dict, region_uuid: str, buff_dist: int) -> 
     
     if hlot_cached is not None:
         hlot = hlot_cached
+    
+    if fmask_cached is not None:
+        fmask = fmask_cached
     
     chot_url = chot.getMapId(imagery_vis)["tile_fetcher"].url_format
     clot_url = clot.getMapId(imagery_vis)["tile_fetcher"].url_format
@@ -136,6 +174,7 @@ def visualize_imagery(uid: str, roi: dict, region_uuid: str, buff_dist: int) -> 
         "clot_image_op": clot_op,
         "hhot_image_op": hhot_op,
         "hlot_image_op": hlot_op,
+        "final_mask_image_op": fmask_op,
         "area_of_focus": ee.Geometry(ee.Geometry.MultiPolygon(buf_excl_roi.transform().coordinates()).getInfo()).toGeoJSON()
     }
 
