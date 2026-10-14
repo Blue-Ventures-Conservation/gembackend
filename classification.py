@@ -22,11 +22,15 @@ hist_class_asset = "hist_class_{region_uuid}"
 class ClassifierFailed(Exception):
     pass
 
-# unused
+class NoTrainingData(Exception):
+    pass
+
 def classification_error(e: Exception) -> Exception:
     e = asset_error(e)
     if type(e) is MissingAsset:
         return e
+    elif "No valid training data were found" in str(e):
+        return NoTrainingData()
     elif "Classifier training failed" in str(e):
         return ClassifierFailed()
     else:
@@ -97,7 +101,7 @@ def classification_export(uid: str, region_uuid: str, cont_key: str, hist_key: s
             "timeout": asset_dl_timeout
         }
     except Exception as e:
-        raise asset_error(e)
+        raise classification_error(e)
 
 def combined_classification(uid: str, region_uuid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int):
     try:
@@ -129,7 +133,7 @@ def combined_classification(uid: str, region_uuid: str, cont_key: str, hist_key:
             "timeout": tile_timeout
         }
     except Exception as e:
-        raise asset_error(e)
+        raise classification_error(e)
 
 def combined_classification_lazy(uid: str, region_uuid: str, cont_key: str, hist_key: str, use_cont_spec: bool, num_label: str, char_label: str, palette: List[str], roi: dict, buff_dist: int) -> Tuple[ee.FeatureCollection, ee.FeatureCollection, ee.Image, ee.Image, ee.Classifier, ee.Classifier, ee.FeatureCollection, ee.FeatureCollection, ee.Geometry, List[str], Dict[str, int], List[str], int]:
     cont_combo, cont_sample, hist_combo, hist_sample, cont_t_poly, hist_t_poly, region, palette, scale = combined_classification_prep(uid, region_uuid, cont_key, hist_key, use_cont_spec, num_label, char_label, palette, roi, buff_dist)

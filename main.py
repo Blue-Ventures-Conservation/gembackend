@@ -285,13 +285,15 @@ def error_check(route: str, content: dict, e: Exception) -> str:
         return "400 no historical images"
     if t is MissingAsset:
         return "400 missing asset"
+    if t is NoTrainingData:
+        return "400 no training data"
     if t is ClassifierFailed:
         return "400 classifier training failed"
-    elif t is InvalidTimePeriod:
+    if t is InvalidTimePeriod:
         return "400 invalid time period"
-    else:
-        logging.exception(e)
-        return "500"
+    
+    logging.exception(e)
+    return "500"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
