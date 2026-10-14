@@ -509,9 +509,9 @@ def shore_refl(imgs: ee.ImageCollection, zone: ee.Geometry, poly: ee.Geometry, s
             .mosaic().clip(poly) \
             .select('qa').eq(50)
     
-    ts = 16
+    ts = 2
     if scale < 30:
-        ts = 1
+        ts = 16
     def mndwi_map(img: ee.Image) -> ee.Image:
         mndwi = produce_mndwi(img)
         # use the MODIS land/water mask and cloud mask to mask out the land

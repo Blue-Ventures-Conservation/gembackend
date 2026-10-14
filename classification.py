@@ -149,7 +149,7 @@ def combined_classification_prep(uid: str, region_uuid: str, cont_key: str, hist
     chot, clot, _, _ = mosaic_indices(conts, buf_excl_roi, indices, scale)
     hhot, hlot, _, _ = mosaic_indices(hists, buf_excl_roi, indices, scale)
     
-    chot, clot, hhot, hlot, fmask,  _, _, _, _ = get_cached_composite_imagery_or_submit(uid, region_uuid, buf_excl_roi, None, None, None, None, None, chot, clot, hhot, hlot, fmask, scale)
+    chot, clot, hhot, hlot, fmask,  _, _, _, _, _ = get_cached_composite_imagery_or_submit(uid, region_uuid, buf_excl_roi, None, None, None, None, None, chot, clot, hhot, hlot, fmask, scale)
     
     if chot is None or clot is None or hhot is None or hlot is None or fmask is None:
         raise Exception("composite cache unavailable")
@@ -163,10 +163,10 @@ def combined_classification_prep(uid: str, region_uuid: str, cont_key: str, hist
     
     ct_poly = training_poly(uid, cont_key, num_label)
     ht_poly = training_poly(uid, hist_key, num_label)
-    cont_sample = sample_image(cont_combo, ct_poly, [num_label, char_label, "ID_Numeric", "id_numeric", "ID", "id"], scale, False)
+    cont_sample = sample_image(cont_combo, ct_poly, [num_label, char_label, "ID_Numeric", "id_numeric", "ID", "id"], scale, True)
     hist_sample = cont_sample
     if not use_cont_spec:
-        hist_sample = sample_image(hist_combo, ht_poly, [num_label, char_label, "ID_Numeric", "id_numeric", "ID", "id"], scale, False)
+        hist_sample = sample_image(hist_combo, ht_poly, [num_label, char_label, "ID_Numeric", "id_numeric", "ID", "id"], scale, True)
     
     expanded_colors = ee.List([])
     if palette is not None:
@@ -277,7 +277,7 @@ def classify_fully(image_op: str, classified: ee.Image, classifier: ee.Classifie
 def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, props: List[str], scale: int, geometries: bool) -> ee.FeatureCollection:
     sample = None
     if scale < 30:
-        ts = 1
+        ts = 16
         
         fifth = t_poly.size().divide(5).int().add(1)
         
@@ -291,7 +291,7 @@ def sample_image(img: ee.Image, t_poly: ee.FeatureCollection, props: List[str], 
         # while also not requiring us to pull down the full FeatureCollection locally
         sample = ee.FeatureCollection([s1, s2, s3, s4, s5]).flatten()
     else:
-        sample = sample_regions(img, t_poly, props, scale, 16, geometries)
+        sample = sample_regions(img, t_poly, props, scale, 2, geometries)
     
     return sample
 
